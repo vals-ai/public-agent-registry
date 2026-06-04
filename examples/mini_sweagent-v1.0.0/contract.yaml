@@ -1,0 +1,29 @@
+name: mini_sweagent-v1.0.0
+
+install_cmd: "bash setup.sh"
+
+run_cmd: >-
+  python3 /bundle/mini_sweagent-v1.0.0/run_with_task_file.py {problem_statement_path}
+  --config=swebench.yaml
+  --environment-class=local
+  --config=model.model_name={model}
+  --output=/logs/mini_sweagent-v1.0.0/trajectory.json
+  --agent-class=default
+  --exit-immediately
+  --yolo
+
+final_output: /logs/mini_sweagent-v1.0.0
+
+# provided:
+#   task_id:
+#     type: str
+#     required: false
+#   problem_statement_path:
+#     type: str
+#     required: true
+
+defaults:
+  model:
+    type: str
+    required: true
+    description: "Model key (e.g. openai/gpt-4o)"
