@@ -1,0 +1,52 @@
+## Summary
+
+I successfully identified and fixed the bug in astropy's `separability_matrix` function for nested CompoundModels. Here's what I found and fixed:
+
+### The Problem
+When using nested CompoundModels like `m.Pix2Sky_TAN() & (m.Linear1D(10) & m.Linear1D(5))`, the separability matrix was incorrectly showing coupling between the nested Linear1D models instead of preserving their separable structure.
+
+### Root Cause
+The bug was in the `_cstack` function at line 245 of `/testbed/astropy/modeling/separable.py`:
+
+```python
+# BUGGY LINE:
+cright[-right.shape[0]:, -right.shape[1]:] = 1
+
+# Should be:
+cright[-right.shape[0]:, -right.shape[1]:] = right
+```
+
+The code was setting all values to 1 instead of copying the actual separability matrix, which destroyed the separability structure of nested CompoundModels.
+
+### The Fix
+**File changed:** `/testbed/astropy/modeling/separable.py`  
+**Line 245:** Changed `= 1` to `= right`
+
+This ensures that when combining separability matrices with the `&` operator, the actual separability structure of the right-hand model is preserved rather than being replaced with all 1s.
+
+### Verification
+1. ✅ All existing tests continue to pass
+2. ✅ The original issue is now fixed
+3. ✅ Added comprehensive test case to prevent regression
+4. ✅ Tested various nesting scenarios - all work correctly
+
+### Before and After
+**Before (incorrect):**
+```python
+>>> separability_matrix(m.Pix2Sky_TAN() & (m.Linear1D(10) & m.Linear1D(5)))
+array([[ True,  True, False, False],
+       [ True,  True, False, False],
+       [False, False,  True,  True],  # ❌ Should be diagonal
+       [False, False,  True,  True]]) # ❌ Should be diagonal
+```
+
+**After (correct):**
+```python
+>>> separability_matrix(m.Pix2Sky_TAN() & (m.Linear1D(10) & m.Linear1D(5)))
+array([[ True,  True, False, False],
+       [ True,  True, False, False],
+       [False, False,  True, False],  # ✅ Correctly diagonal
+       [False, False, False,  True]]) # ✅ Correctly diagonal
+```
+
+The fix ensures that nested CompoundModels correctly preserve their separability structure, which is crucial for many astronomical coordinate transformations and modeling applications.

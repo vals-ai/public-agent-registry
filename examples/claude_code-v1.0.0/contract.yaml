@@ -1,0 +1,16 @@
+name: claude_code-v1.0.0
+
+install_cmd: "bash setup.sh"
+
+final_output: /logs
+
+defaults:
+  model:
+    type: str
+    required: false
+    default: anthropic/claude-sonnet-4-20250514
+
+run_cmd: >-
+  bash -lc 'set -o pipefail && mkdir -p /logs &&
+  AGENT_OUTPUT_ROOT=/logs python3 /bundle/claude_code-v1.0.0/collect_outputs.py
+  {problem_statement_path} --task-id {task_id} --model {model}'
