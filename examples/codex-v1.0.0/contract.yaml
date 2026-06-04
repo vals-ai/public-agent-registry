@@ -1,0 +1,24 @@
+name: codex-v1.0.0
+
+install_cmd: "bash setup.sh"
+
+final_output: /logs
+
+defaults:
+  model:
+    type: str
+    required: false
+    default: gpt-5.3-codex
+    choices:
+      - gpt-5.3-codex
+      - gpt-5.4
+      - gpt-5.2-codex
+      - gpt-5.2
+      - gpt-5.1-codex-max
+      - gpt-5.1-codex-mini
+
+run_cmd: >-
+  bash -lc 'set -o pipefail && mkdir -p /logs &&
+  AGENT_OUTPUT_ROOT=/logs /bundle/codex-v1.0.0/.venv/bin/python3
+  /bundle/codex-v1.0.0/collect_outputs.py {problem_statement_path}
+  --task-id {task_id} --model {model}'
