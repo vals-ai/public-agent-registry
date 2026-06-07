@@ -36,7 +36,7 @@ as submodules under `agents/`.
 Install an agent by pointing Valkyrie at the agent directory:
 
 ```bash
-valkyrie agent install path/to/github/url/agents/<agent-name>
+valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/main/agents/<agent-name>
 ```
 
 Run a small slice with a benchmark to test:

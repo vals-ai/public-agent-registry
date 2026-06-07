@@ -17,7 +17,7 @@ We assume if you are here that you have [valkyrie](https://github.com/vals-ai/Va
 Install the agent from github using valkyrie for future use
 
 ```bash
-valkyrie agent install path/to/github/url/examples/codex-v1.0.0
+valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/jf/agent-checkpoint/examples/codex-v1.0.0
 ```
 
 Download the agent, visit the [documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md) on **contract.yaml** if you would like to make any modifications.
@@ -35,7 +35,7 @@ valkyrie agent push codex-v1.0.0
 Run a benchmark using codex as the agent, specify `--model <MODEL>` to change the underlying model that powers codex. Append to the contract or change it to allow any codex compatible model when running codex.
 
 ```bash
-valkyrie run start --benchmark swebench --agent codex-v1.0.0 -s OPENAI_API_KEY <AWS KEYNAME> --concurrency 10 --slice :10
+valkyrie run start --benchmark swebench --agent codex-v1.0.0 -s OPENAI_API_KEY <CLOUD_KEYNAME> --concurrency 10 --slice :10
 ```
 
 ## Output Files
