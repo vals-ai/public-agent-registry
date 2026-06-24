@@ -1,0 +1,4 @@
+[submodule "agents/terminus2"]
+	path = agents/terminus2
+	url = https://github.com/vals-ai/terminus2.git
+	branch = main
