@@ -1,0 +1,20 @@
+[project]
+name = "proof-bench-valkyrie-wrapper"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["proof-bench"]
+
+[tool.uv.sources]
+proof-bench = { path = "./proof_bench_agent", editable = true }
+
+[tool.uv]
+override-dependencies = [
+    "model-library @ git+ssh://git@github.com/vals-ai/model-proxy.git@dev",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []

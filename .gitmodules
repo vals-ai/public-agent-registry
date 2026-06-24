@@ -2,3 +2,7 @@
 	path = agents/terminus2
 	url = https://github.com/vals-ai/terminus2.git
 	branch = main
+[submodule "agents/proof_bench_agent/proof_bench_agent"]
+	path = agents/proof_bench_agent/proof_bench_agent
+	url = https://github.com/vals-ai/proof-bench.git
+	branch = main
