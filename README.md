@@ -20,9 +20,6 @@ contributions will not be accepted.
 
 - [terminus2](agents/terminus2): Terminus 2 terminal-based agent for
   containerized benchmark tasks.
-- [proof_bench_agent](agents/proof_bench_agent): Proof Bench theorem-proving
-  agent wrapper.
-- [fabv2_agent](agents/fabv2_agent): Finance Agent Benchmark v2 agent wrapper.
 
 ## Agent Directory Shape
 
