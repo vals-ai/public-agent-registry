@@ -18,8 +18,11 @@ contributions will not be accepted.
 
 ## Agents
 
-- [terminus2](agents/terminus2): Terminus 2 terminal-based agent for
+- [terminus2](agents/terminus2-v1.0.0): Terminus 2 terminal-based agent for
   containerized benchmark tasks.
+- [terminus2 private-registry pin](agents/terminus2): Terminus 2 copied from the
+  private registry.
+
 
 ## Agent Directory Shape
 
