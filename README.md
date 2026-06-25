@@ -16,6 +16,11 @@ contributions will not be accepted.
 - `examples/`: example contracts and reference implementations only.
 - `CONTRIBUTING.md`: contribution workflow and review expectations.
 
+## Agents
+
+- [terminus2](agents/terminus2-v1.0.0): Terminus 2 terminal-based agent for
+  containerized benchmark tasks.
+
 ## Agent Directory Shape
 
 Each agent directory should include:
