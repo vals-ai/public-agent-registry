@@ -20,6 +20,8 @@ contributions will not be accepted.
 
 - [terminus2](agents/terminus2-v1.0.0): Terminus 2 terminal-based agent for
   containerized benchmark tasks.
+- [mini_sweagent-v1.0.0](agents/mini_sweagent-v1.0.0): Mini SWE-agent
+  for SWE-bench tasks, packaged with the public model library.
 
 ## Agent Directory Shape
 
