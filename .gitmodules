@@ -4,3 +4,6 @@
 [submodule "agents/mini_sweagent-v1.0.0"]
 	path = agents/mini_sweagent-v1.0.0
 	url = https://github.com/vals-ai/mini_sweagent-v1.0.0.git
+[submodule "agents/fabv2_agent-v1.0.0"]
+	path = agents/fabv2_agent-v1.0.0
+	url = https://github.com/vals-ai/fabv2_agent-v1.0.0.git
