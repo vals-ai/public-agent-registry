@@ -22,6 +22,10 @@ contributions will not be accepted.
   containerized benchmark tasks.
 - [mini_sweagent-v1.0.0](agents/mini_sweagent-v1.0.0): Mini SWE-agent
   for SWE-bench tasks, packaged with the public model library.
+- [fabv2_agent-v1.0.0](agents/fabv2_agent-v1.0.0): Finance research agent
+  for FABv2 tasks.
+- [proof_bench_agent-v1.0.0](agents/proof_bench_agent-v1.0.0): Formal proof
+  agent for ProofBench tasks.
 
 ## Agent Directory Shape
 
