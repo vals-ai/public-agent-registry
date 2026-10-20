@@ -1,18 +1,18 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -1752,7 +1752,6 @@ source = { editable = "." }
 dependencies = [
     { name = "datasets" },
     { name = "jinja2" },
-    { name = "litellm" },
     { name = "model-library" },
     { name = "platformdirs" },
     { name = "prompt-toolkit" },
@@ -1789,6 +1788,7 @@ dev = [
 full = [
     { name = "boto3" },
     { name = "contree-sdk" },
+    { name = "litellm" },
     { name = "mike" },
     { name = "mkdocs-glightbox" },
     { name = "mkdocs-include-markdown-plugin" },
@@ -1804,6 +1804,9 @@ full = [
     { name = "pytest-xdist" },
     { name = "ruff" },
     { name = "swe-rex" },
+]
+litellm = [
+    { name = "litellm" },
 ]
 modal = [
     { name = "boto3" },
@@ -1824,10 +1827,11 @@ requires-dist = [
     { name = "contree-sdk", marker = "extra == 'contree'", specifier = ">=0.1.0" },
     { name = "datasets" },
     { name = "jinja2" },
-    { name = "litellm", specifier = "==1.81.16" },
+    { name = "litellm", marker = "extra == 'litellm'", specifier = "==1.81.16" },
     { name = "mike", marker = "extra == 'dev'" },
     { name = "mini-swe-agent", extras = ["contree"], marker = "extra == 'full'" },
     { name = "mini-swe-agent", extras = ["dev"], marker = "extra == 'full'" },
+    { name = "mini-swe-agent", extras = ["litellm"], marker = "extra == 'full'" },
     { name = "mini-swe-agent", extras = ["modal"], marker = "extra == 'full'" },
     { name = "mkdocs-glightbox", marker = "extra == 'dev'" },
     { name = "mkdocs-include-markdown-plugin", marker = "extra == 'dev'" },
@@ -1856,7 +1860,7 @@ requires-dist = [
     { name = "textual" },
     { name = "typer" },
 ]
-provides-extras = ["full", "modal", "dev", "contree"]
+provides-extras = ["litellm", "full", "modal", "dev", "contree"]
 
 [package.metadata.requires-dev]
 dev = [
