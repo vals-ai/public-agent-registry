@@ -12,7 +12,7 @@ import yaml
 from minisweagent import package_dir
 from minisweagent.agents.default import DefaultAgent
 from minisweagent.environments.local import LocalEnvironment
-from minisweagent.models.litellm_model import LitellmModel
+from minisweagent.models import get_model
 
 app = typer.Typer()
 
@@ -30,7 +30,7 @@ def main(
 ) -> DefaultAgent:
     logging.basicConfig(level=logging.DEBUG)
     agent = DefaultAgent(
-        LitellmModel(model_name=model_name),
+        get_model(model_name),
         LocalEnvironment(),
         **yaml.safe_load(Path(package_dir / "config" / "default.yaml").read_text())["agent"],
     )
