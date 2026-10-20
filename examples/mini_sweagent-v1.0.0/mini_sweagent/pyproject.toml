@@ -65,6 +65,7 @@ modal = [
 ]
 
 dev = [
+    "mini-swe-agent[litellm]",
     "pytest",
     "pytest-cov",
     "pytest-asyncio",

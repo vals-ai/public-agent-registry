@@ -1770,6 +1770,7 @@ contree = [
     { name = "contree-sdk" },
 ]
 dev = [
+    { name = "litellm" },
     { name = "mike" },
     { name = "mkdocs-glightbox" },
     { name = "mkdocs-include-markdown-plugin" },
@@ -1831,6 +1832,7 @@ requires-dist = [
     { name = "mike", marker = "extra == 'dev'" },
     { name = "mini-swe-agent", extras = ["contree"], marker = "extra == 'full'" },
     { name = "mini-swe-agent", extras = ["dev"], marker = "extra == 'full'" },
+    { name = "mini-swe-agent", extras = ["litellm"], marker = "extra == 'dev'" },
     { name = "mini-swe-agent", extras = ["litellm"], marker = "extra == 'full'" },
     { name = "mini-swe-agent", extras = ["modal"], marker = "extra == 'full'" },
     { name = "mkdocs-glightbox", marker = "extra == 'dev'" },
