@@ -42,13 +42,13 @@ None. The adapter has a fixed 600-second execution timeout, followed by a 10-sec
 
 ## Usage with Valkyrie
 
-Configure [Valkyrie](https://github.com/vals-ai/Valkyrie) for the desired environment. Install this registry contract directory:
+Configure [Valkyrie](https://github.com/vals-ai/Valkyrie) for the desired environment. Install this agent directory:
 
 ```bash
-valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/codex-native-opencode-v1.0.0/contracts/opencode-v1.0.0
+valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/codex-native-opencode-v1.0.0/agents/opencode-v1.0.0
 ```
 
-This command targets the PR branch; after merge, use `main` in its place. The native upstream is pinned at [agents/opencode-v1.0.0](../../agents/opencode-v1.0.0). Valkyrie installs the published native release from `setup.sh`; the upstream checkout is kept outside the install bundle. No separate integration repository is required.
+This command targets the PR branch; after merge, use `main` in its place. This directory contains the contract, setup, README and adapter needed to install the integration. `setup.sh` installs the published upstream release pinned in [upstream.json](upstream.json) and the npm lockfile. No source submodule is needed.
 
 Example for a later one-task smoke run; it has not been executed:
 

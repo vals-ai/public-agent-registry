@@ -4,6 +4,3 @@
 [submodule "agents/mini_sweagent-v1.0.0"]
 	path = agents/mini_sweagent-v1.0.0
 	url = https://github.com/vals-ai/mini_sweagent-v1.0.0.git
-[submodule "agents/opencode-v1.0.0"]
-	path = agents/opencode-v1.0.0
-	url = https://github.com/anomalyco/opencode.git

@@ -4,8 +4,9 @@
 
 - Agent name:
 - Version:
-- Submodule path: `agents/<agent-name>`
-- Contract path: `contracts/<agent-name>` (or the submodule itself)
+- Agent directory: `agents/<agent-name>`
+- Installation method and pinned native version:
+- Source submodule (if needed): `agents/<agent-name>/upstream` or None
 - Upstream repository link:
 
 ## Description
@@ -14,9 +15,10 @@
 
 ## Submission Checklist
 
-- [ ] The agent is added under `agents/` as a Git submodule.
-- [ ] `contract.yaml` and `setup.sh` are included in the contract directory.
-- [ ] The contract directory includes a `README.md` following the [shared format](../../templates/agent-README.md).
+- [ ] The agent is a self-contained directory under `agents/`.
+- [ ] Native dependencies are pinned; any required source submodule is inside the agent directory.
+- [ ] `contract.yaml` and `setup.sh` are included in the agent directory.
+- [ ] The agent directory includes a `README.md` following the [shared format](../../templates/agent-README.md).
 - [ ] The contract follows the [contract documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md).
 - [ ] Agent has been tested out on [valkyrie](https://github.com/vals-ai/Valkyrie#start-a-run).
 
@@ -43,13 +45,13 @@ Commands to test through valkyrie:
 Install agent
 
 ```bash
-valkyrie agent install path/to/github/url/agents/<agent-name>
+valkyrie agent install 'https://github.com/vals-ai/public-agent-registry/tree/REGISTRY_COMMIT_SHA/agents/AGENT_DIRECTORY'
 ```
 
 Run agent
 
 ```bash
-valkyrie run start --benchmark swebench --agent <agent-name> --concurrency 1 --slice :1
+valkyrie run start --benchmark swebench --agent 'CONTRACT_AGENT_NAME' --concurrency 1 --slice 0:1
 ```
 
 ## Known Limitations / Issues
