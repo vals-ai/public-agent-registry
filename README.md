@@ -25,6 +25,8 @@ directory maintained in this registry.
 - [mini_sweagent-v1.0.0](agents/mini_sweagent-v1.0.0): Mini SWE-agent
   for SWE-bench tasks, packaged with the public model library.
 
+- [Oh My Pi v1.0.0](contracts/omp-v1.0.0/README.md): native upstream `18.12.6` with a registry-maintained Valkyrie contract.
+
 ## Agent Directory Shape
 
 Each installable contract directory should include:
