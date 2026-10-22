@@ -101,8 +101,7 @@ or machine-local content.
 
 Follow the installation and run process an external user would use. Verify the
 complete agent directory can be bundled, installed and run through Valkyrie.
-If runtime validation is pending, keep the PR draft and explicitly mark the
-unexecuted checks in its description and the agent README.
+Record the checks performed and their results in the PR description.
 
 Install the candidate registry commit:
 

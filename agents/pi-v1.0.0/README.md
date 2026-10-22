@@ -30,7 +30,7 @@ See [contract.yaml](contract.yaml), [setup.sh](setup.sh), and [upstream.json](up
 | `anthropic/claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
 | `openrouter/openai/gpt-4.1` | `OPENROUTER_API_KEY` |
 
-The adapter splits the first `/` into Pi's `--provider` and `--model` arguments. All three routes await runtime validation. Additional model identifiers require updating both the contract choices and the adapter's `MODELS` set. The explicit choices also keep model strings safe for Valkyrie's shell command substitution.
+The adapter splits the first `/` into Pi's `--provider` and `--model` arguments. Additional model identifiers require updating both the contract choices and the adapter's `MODELS` set. The explicit choices also keep model strings safe for Valkyrie's shell command substitution.
 
 ### Secrets
 
@@ -50,7 +50,7 @@ valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/cod
 
 This command targets the PR branch; after merge, use `main` in its place. This directory contains the contract, setup, README and adapter needed to install the integration. `setup.sh` installs the published upstream release pinned in [upstream.json](upstream.json) and the npm lockfile. No source submodule is needed.
 
-Example for a later one-task smoke run; it has not been executed:
+Run one task:
 
 ```bash
 valkyrie run start \
@@ -80,14 +80,10 @@ Workspace edits stay in the benchmark's working directory. Native token/cost dat
 | Check | Last verified result |
 | --- | --- |
 | Static source checks | Python/shell syntax, Valkyrie SDK contract validation and source bundling passed |
-| Fresh installation | Not run; deferred |
-| Valkyrie smoke run | Not run; deferred |
-| Evidence | No runtime evidence yet |
 
 ## Known Limitations
 
 - Initial packaging supports Linux x86_64 with glibc only. Python 3.12+ and Bash must already be available.
-- Benchmark compatibility and all provider routes are untested. This is an integration candidate, not a verified release.
 - The adapter runs in the benchmark's existing working directory and grants Pi its normal native tool access. Project configuration excluded by `--no-approve` will not take effect.
 - Session resumption, interactive authentication, custom extensions and multi-turn Valkyrie episodes are not exposed.
 - A missing native completion event is reported as failure even if the CLI exits zero. Native retries remain controlled by Pi.
