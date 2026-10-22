@@ -6,6 +6,5 @@
   "binary": {
     "platform": "linux-x86_64",
     "sha256": "85d9daf3a05fc76e8cd425ae1904eb576af8d21cc85fcf4690742626e07ccfa4"
-  },
-  "source_submodule": "agents/omp-v1.0.0"
+  }
 }
