@@ -1,0 +1,8 @@
+{
+  "agent": "pi",
+  "repository": "https://github.com/earendil-works/pi",
+  "package": "@earendil-works/pi-coding-agent",
+  "version": "1.4.0",
+  "commit": "4a080252f06caf63a525d7873c5d94d3c23887e0",
+  "source_submodule": "agents/pi-v1.0.0"
+}
