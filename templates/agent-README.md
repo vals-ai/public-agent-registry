@@ -1,9 +1,9 @@
-<!-- Copy this file to contracts/<agent-name>/README.md for native upstream
-integrations. Keep the original agent repository pinned as a Git submodule at
-agents/<agent-name>. Self-contained agent submodules may keep this README beside
-their contract.yaml instead. Replace placeholders before publishing and preserve
-the section order. Describe implemented behavior and actual validation only.
-The integration release and native upstream version are separate.
+<!-- Copy this file to agents/<agent-name>/README.md, beside contract.yaml and
+setup.sh. Install a pinned upstream package or release when available; include
+upstream source as a nested submodule only when the integration needs it.
+Replace placeholders before publishing and preserve the section order. Describe
+implemented behavior and actual validation only. The integration release and
+native upstream version are separate.
 -->
 
 # {{Agent name}} v{{integration version}} for Valkyrie
@@ -61,14 +61,12 @@ Install and configure [Valkyrie](https://github.com/vals-ai/Valkyrie) first, inc
 Install this integration:
 
 ```bash
-valkyrie agent install 'https://github.com/vals-ai/public-agent-registry/tree/main/contracts/AGENT_DIRECTORY'
+valkyrie agent install 'https://github.com/vals-ai/public-agent-registry/tree/main/agents/AGENT_DIRECTORY'
 ```
 
-<!-- Replace AGENT_DIRECTORY with the versioned contract directory name. For a
-self-contained integration, use its agents/ path instead of contracts/. Publish
+<!-- Replace AGENT_DIRECTORY with the versioned agent directory name. Publish
 the main-branch command only once that path is available; before merge, use a
-public candidate registry commit instead of main. A direct public integration
-repository URL is also valid if the contract is at that repository's root. -->
+public candidate registry commit instead of main. -->
 
 Run one task:
 
