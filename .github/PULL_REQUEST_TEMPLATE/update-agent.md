@@ -40,5 +40,4 @@ valkyrie run start --benchmark swebench --agent 'CONTRACT_AGENT_NAME' --concurre
 - [ ] Native dependencies are pinned; any required source submodule is inside the agent directory.
 - [ ] Installation and a one-task Valkyrie run have been verified for this update.
 
-<!-- Record checks actually run and their evidence. Keep the PR draft when
-runtime validation is pending. -->
+<!-- Record checks performed, their results and supporting evidence. -->

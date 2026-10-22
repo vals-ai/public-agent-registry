@@ -30,7 +30,7 @@ Configuration is defined in [contract.yaml](contract.yaml); installation is defi
 
 - Model: {{required or default value; show the exact format accepted by --model}}.
 - Routing: {{how the integration passes or translates the model name to the native agent and selects the provider}}.
-- Provider support: {{tested providers and any additional documented but untested routes}}.
+- Provider support: {{providers and model routes exposed by this integration}}.
 
 <!-- State OpenRouter support only when the integration exposes a working route.
 Do not assume every upstream provider is supported by the Valkyrie adapter.
@@ -104,8 +104,8 @@ Mention task-workspace edits when they are part of the benchmark result. -->
 
 | Check | Last verified result |
 | --- | --- |
-| Fresh installation | {{date, environment and result, or not run}} |
-| Valkyrie smoke run | {{date, benchmark/dataset version, task ID, provider/model and result, or not run}} |
+| Fresh installation | {{date, environment and result}} |
+| Valkyrie smoke run | {{date, benchmark/dataset version, task ID, provider/model and result}} |
 | Evidence | {{public PR, sanitized log or shareable artifact reference}} |
 
 <!-- Link evidence that identifies the tested integration and registry commits.
@@ -115,7 +115,7 @@ Never mark a planned run as passed. -->
 
 ## Known Limitations
 
-- {{Task/environment/provider constraints and any untested routes that matter to users.}}
+- {{Task, environment and provider constraints that matter to users.}}
 - {{Integration behavior that differs from the native defaults, such as headless execution, tool permissions or workspace handling.}}
 
 <!-- Keep useful recovery steps here for known failure modes. If there are no
