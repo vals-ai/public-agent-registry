@@ -1,0 +1,17 @@
+name: omp-v1.0.0
+install_cmd: bash setup.sh
+run_cmd: >-
+  python3 /bundle/omp-v1.0.0/run.py
+  --task "{problem_statement_path}"
+  --model "{model}"
+  --output /logs/omp-v1.0.0
+final_output: /logs/omp-v1.0.0
+defaults:
+  model:
+    type: str
+    required: true
+    description: Explicit provider/model identifier passed to the native agent
+    choices:
+      - openai/gpt-4.1
+      - anthropic/claude-sonnet-4-5
+      - openrouter/openai/gpt-4.1
