@@ -6,6 +6,7 @@
 - Version before:
 - Version after:
 - Submodule path: `agents/<agent-name>`
+- Contract path: `contracts/<agent-name>` (or the submodule itself)
 - Upstream repository:
 
 ## Summary of changes

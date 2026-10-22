@@ -5,6 +5,7 @@
 - Agent name:
 - Version:
 - Submodule path: `agents/<agent-name>`
+- Contract path: `contracts/<agent-name>` (or the submodule itself)
 - Upstream repository link:
 
 ## Description
@@ -14,8 +15,8 @@
 ## Submission Checklist
 
 - [ ] The agent is added under `agents/` as a Git submodule.
-- [ ] `contract.yaml` is included.
-- [ ] `README.md` is included that documents usage.
+- [ ] `contract.yaml` and `setup.sh` are included in the contract directory.
+- [ ] The contract directory includes a `README.md` following the [shared format](../../templates/agent-README.md).
 - [ ] The contract follows the [contract documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md).
 - [ ] Agent has been tested out on [valkyrie](https://github.com/vals-ai/Valkyrie#start-a-run).
 
