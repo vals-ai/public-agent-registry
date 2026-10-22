@@ -1,0 +1,7 @@
+{
+  "agent": "opencode",
+  "repository": "https://github.com/anomalyco/opencode",
+  "package": "opencode-ai",
+  "version": "1.19.3",
+  "commit": "e3c4eb242585dcd77be1a867391b7c25fd47ce52"
+}
