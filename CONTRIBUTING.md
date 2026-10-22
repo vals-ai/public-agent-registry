@@ -5,27 +5,38 @@ make agents easy to discover, install, run, and compare with Valkyrie.
 
 ## Add an Agent
 
-Add contributed agents under `agents/` as Git submodules. Non-submodule agent
-contributions will not be accepted. The reason for this is to simplify the review process and make it easier for you, the submitter to make changes. Maintaining multiple versions of an agent can be cumbersome, submodules are the best way to share without over-extending reviewers or yourself.
-
-```bash
-git submodule add https://github.com/<owner>/<agent-repo>.git agents/<agent-name>
-git submodule update --init --recursive agents/<agent-name>
-```
-
-Use a stable, versioned directory name when publishing a release-style agent,
-for example:
+Add a self-contained, versioned directory under `agents/`. Keep the Valkyrie
+contract, setup, README and adapter together so that directory can be installed
+on its own:
 
 ```text
-agents/my_agent-v1.0.0
+agents/my_agent-v1.0.0/
+  contract.yaml
+  setup.sh
+  README.md
+  ...                       # adapter and pinned dependency metadata as needed
+  upstream/                 # optional source submodule, only when needed
 ```
 
-Inside the agent directory, include the Valkyrie contract files needed to run
-the agent:
+Prefer installing an exact version of the agent's original public package or
+prebuilt release from `setup.sh`. Include dependency lockfiles or release
+checksums as appropriate, and record the native version and repository in the
+README and integration metadata. A package-based integration does not need a
+source submodule or a separate integration repository.
 
-- `contract.yaml`
-- `setup.sh`
-- `README.md`
+If setup needs the upstream source, add it as a nested submodule inside the
+agent directory and pin the required commit:
+
+```bash
+git submodule add https://github.com/<owner>/<agent-repo>.git agents/my_agent-v1.0.0/upstream
+git -C agents/my_agent-v1.0.0/upstream checkout <upstream-commit>
+git add agents/my_agent-v1.0.0/upstream .gitmodules
+```
+
+Ensure required submodules are initialized and their source is included when
+building the install bundle. Do not depend on sibling directories elsewhere in
+the registry. Existing agent submodules that already contain their own contract,
+setup and README remain supported.
 
 The goal is to allow users to install and run agents without needing to make any modifications.
 
@@ -43,18 +54,34 @@ Each agent README should include (to make the agent easy to use):
 - Any secrets required to run the agent
 - Usage through Valkyrie
 
-### Example commands:
+For new integrations, start from the shared
+[agent README template](templates/agent-README.md). Keep its section order and
+fill in the agent's native upstream/version, runtime requirements, configuration,
+usage, outputs, validation, limitations, and license. Use `None` or
+`Not applicable` where a section does not apply. Document only implemented
+behavior and record checks that have actually run.
 
-Install the agent
+Keep the integration README at `agents/<agent-name>/README.md`, alongside
+`contract.yaml` and `setup.sh`. Maintain these files in the same PR as the
+package pin or optional nested source submodule.
+
+Distinguish the integration release from the native agent version. Document only
+the options exposed by the Valkyrie contract, and label native-only CLI options
+separately if included. Provide a one-task run example and use placeholders for
+the user's secret-store names, never raw credentials.
+
+### Example commands
+
+Install the agent:
 
 ```bash
-valkyrie agent install path/to/github/url/agents/<agent-name>
+valkyrie agent install 'https://github.com/vals-ai/public-agent-registry/tree/main/agents/AGENT_DIRECTORY'
 ```
 
-Agent usage with valkyrie
+Run through Valkyrie:
 
 ```bash
-valkyrie run start --benchmark swebench --agent <agent-name> --concurrency 10 --slice :10
+valkyrie run start --benchmark swebench --agent 'CONTRACT_AGENT_NAME' --concurrency 1 --slice 0:1
 ```
 
 ## Output Expectations
@@ -70,27 +97,27 @@ secret values.
 Before opening a pull request, scan your agent directory for accidental private
 or machine-local content.
 
-## Before opening a pr
+## Validation Before Review
 
-Before contributing, run through the process of how an external user would install and run your agent. Doing a pass before opening a pr will save time and ensure that everything is working.
+Follow the installation and run process an external user would use. Verify the
+complete agent directory can be bundled, installed and run through Valkyrie.
+Record the checks performed and their results in the PR description.
 
-Commands to test through valkyrie:
-
-Install agent
+Install the candidate registry commit:
 
 ```bash
-valkyrie agent install path/to/github/url/agents/<agent-name>
+valkyrie agent install 'https://github.com/vals-ai/public-agent-registry/tree/REGISTRY_COMMIT_SHA/agents/AGENT_DIRECTORY'
 ```
 
-Run agent
+Run one task:
 
 ```bash
-valkyrie run start --benchmark swebench --agent <agent-name> --concurrency 1 --slice :1
+valkyrie run start --benchmark swebench --agent 'CONTRACT_AGENT_NAME' --concurrency 1 --slice 0:1
 ```
 
 ## Pull Requests
 
-PR templates have been created to give a direction on what we are looking for.
+Use the appropriate template to describe the integration and its validation:
 
 - Contributing an agent to the registry -> [add-agent.md](.github/PULL_REQUEST_TEMPLATE/add-agent.md)
 - Updating an agent -> [update-agent.md](.github/PULL_REQUEST_TEMPLATE/update-agent.md)
