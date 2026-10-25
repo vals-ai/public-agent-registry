@@ -65,11 +65,10 @@ If this is not enough, our model class should be simple to modify:
 
 ??? note "Complete model class"
 
-    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/models/litellm_model.py)
-    - [API reference](../reference/models/litellm.md)
+    - [Read on GitHub](https://github.com/swe-agent/mini-swe-agent/blob/main/src/minisweagent/models/vals_model.py)
 
     ```python
-    --8<-- "src/minisweagent/models/litellm_model.py"
+    --8<-- "src/minisweagent/models/vals_model.py"
     ```
 
 The other part that you most likely need to figure out are costs.

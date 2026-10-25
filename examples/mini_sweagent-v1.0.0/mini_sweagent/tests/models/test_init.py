@@ -53,11 +53,6 @@ class TestGetModelClass:
         for name in ["anthropic", "sonnet", "opus", "claude-sonnet", "gpt-4", "random-model"]:
             assert get_model_class(name) == ValsModel
 
-    def test_litellm_response_model_selection(self):
-        """Test that litellm_response model class can be selected."""
-        from minisweagent.models.litellm_response_model import LitellmResponseModel
-
-        assert get_model_class("any-model", "litellm_response") == LitellmResponseModel
 
 
 class TestGetModel:
@@ -90,25 +85,6 @@ class TestGetModel:
             assert isinstance(model, DeterministicModel)
             assert model.config.outputs == [hello_output]
             assert model.config.model_name == "test-model"
-
-    def test_config_api_key_used_when_no_env_var(self):
-        """Test that config api_key is used when env var is not set."""
-        with patch.dict(os.environ, {}, clear=True):
-            config = {"model_kwargs": {"api_key": "config-key"}, "model_class": "litellm"}
-            model = get_model("test-model", config)
-
-            # LitellmModel stores the api_key in model_kwargs
-            assert model.config.model_kwargs["api_key"] == "config-key"
-
-    def test_no_api_key_when_none_provided(self):
-        """Test that no api_key is set when neither env var nor config provide one."""
-        with patch.dict(os.environ, {}, clear=True):
-            config = {"model_class": "litellm"}
-            model = get_model("test-model", config)
-
-            # LitellmModel should not have api_key when none provided
-            model_kwargs = getattr(model.config, "model_kwargs", {})
-            assert "api_key" not in model_kwargs
 
     def test_get_deterministic_model(self):
         """Test that get_model can instantiate DeterministicModel via model_class parameter."""
