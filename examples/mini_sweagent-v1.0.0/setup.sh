@@ -9,13 +9,14 @@ apt-get install -y curl
 
 # Install uv
 uv_installer="$(mktemp)"
-curl -LsSf https://github.com/astral-sh/uv/releases/download/0.12.5/uv-installer.sh -o "$uv_installer"
-printf '%s  %s\n' '504511fbbbd811aeaba6738abc79408956b6c7da0ca35437b3dcc24a41efc111' "$uv_installer" | sha256sum -c -
+curl -LsSf https://github.com/astral-sh/uv/releases/download/0.13.5/uv-installer.sh -o "$uv_installer"
+printf '%s  %s\n' '1c6e7f025499664633ac2dce43a210800510e9ef0625c52e034a8afdf8bf177a' "$uv_installer" | sha256sum -c -
 sh "$uv_installer"
 rm "$uv_installer"
 
 # Source uv so it's available in this session
 source "$HOME/.local/bin/env" 2>/dev/null || true
+export PATH="$HOME/.local/bin:$PATH"
 
 cd mini_sweagent && uv sync
 
