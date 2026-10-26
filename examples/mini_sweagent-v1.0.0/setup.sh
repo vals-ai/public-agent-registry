@@ -8,7 +8,11 @@ apt-get update
 apt-get install -y curl
 
 # Install uv
-curl -LsSf https://astral.sh/uv/0.12.5/install.sh | sh
+uv_installer="$(mktemp)"
+curl -LsSf https://github.com/astral-sh/uv/releases/download/0.12.5/uv-installer.sh -o "$uv_installer"
+printf '%s  %s\n' '504511fbbbd811aeaba6738abc79408956b6c7da0ca35437b3dcc24a41efc111' "$uv_installer" | sha256sum -c -
+sh "$uv_installer"
+rm "$uv_installer"
 
 # Source uv so it's available in this session
 source "$HOME/.local/bin/env" 2>/dev/null || true
