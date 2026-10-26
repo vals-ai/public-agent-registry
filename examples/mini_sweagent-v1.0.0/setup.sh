@@ -8,7 +8,7 @@ apt-get update
 apt-get install -y curl
 
 # Install uv
-curl -LsSf https://astral.sh/uv/0.7.13/install.sh | sh
+curl -LsSf https://astral.sh/uv/0.12.5/install.sh | sh
 
 # Source uv so it's available in this session
 source "$HOME/.local/bin/env" 2>/dev/null || true
