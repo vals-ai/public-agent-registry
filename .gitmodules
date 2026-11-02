@@ -6,3 +6,7 @@
 	path = agents/opencode/opencode
 	url = https://github.com/anomalyco/opencode.git
 	shallow = true
+[submodule "agents/pi/pi"]
+	path = agents/pi/pi
+	url = https://github.com/earendil-works/pi.git
+	shallow = true

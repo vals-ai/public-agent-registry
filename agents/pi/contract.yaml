@@ -1,0 +1,11 @@
+name: pi
+install_cmd: bash setup.sh
+run_cmd: pi-run "{problem_statement_path}" "{model}" "{thinking}"
+final_output: /logs/pi
+output_artifacts:
+  - {path: pi/summary.json, source: /logs/pi/summary.json, required: false}
+  - {path: pi/session.jsonl, source: "/logs/pi/sessions/*.jsonl", required: false}
+defaults:
+  model: {type: str, required: true, description: "provider/id, e.g. anthropic/claude-sonnet-4-6"}
+kwargs:
+  thinking: {type: str, required: false, default: "", description: "Thinking level: off, minimal, low, medium, high, xhigh or max; empty keeps pi's default (medium)"}
