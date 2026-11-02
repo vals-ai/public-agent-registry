@@ -1,0 +1,6 @@
+{
+  "repo": "harbor-framework/harbor",
+  "tag": "v0.25.0",
+  "commit": "fdba28fc411e47e8765420a1a063b4918fce3def",
+  "submodule": "harbor"
+}

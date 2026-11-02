@@ -1,0 +1,16 @@
+[submodule "agents/mini_swe_agent/mini-swe-agent"]
+	path = agents/mini_swe_agent/mini-swe-agent
+	url = https://github.com/SWE-agent/mini-swe-agent.git
+	shallow = true
+[submodule "agents/opencode/opencode"]
+	path = agents/opencode/opencode
+	url = https://github.com/anomalyco/opencode.git
+	shallow = true
+[submodule "agents/pi/pi"]
+	path = agents/pi/pi
+	url = https://github.com/earendil-works/pi.git
+	shallow = true
+[submodule "agents/terminus2/harbor"]
+	path = agents/terminus2/harbor
+	url = https://github.com/harbor-framework/harbor.git
+	shallow = true

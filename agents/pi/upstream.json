@@ -1,0 +1,10 @@
+{
+  "repo": "earendil-works/pi",
+  "tag": "v1.4.0",
+  "commit": "4a080252f06caf63a525d7873c5d94d3c23887e0",
+  "submodule": "pi",
+  "assets": [
+    "pi-linux-x64.tar.gz",
+    "pi-linux-arm64.tar.gz"
+  ]
+}

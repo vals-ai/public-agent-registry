@@ -1,0 +1,89 @@
+#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+here="$(pwd)"
+install_dir=/opt/pi
+release=https://github.com/earendil-works/pi/releases/download
+
+case "$(uname -m)" in
+  x86_64) arch=x64 jq_arch=amd64 ;;
+  aarch64 | arm64) arch=arm64 jq_arch=arm64 ;;
+  *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+musl=""
+ldd_output="$(ldd --version 2>&1 || true)"
+case "$ldd_output" in
+  *[Mm][Uu][Ss][Ll]*) musl=1 ;;
+esac
+if [ -f /etc/alpine-release ]; then
+  musl=1
+fi
+if [ -n "$musl" ]; then
+  echo "pi's release binaries need glibc; this image uses musl" >&2
+  exit 1
+fi
+
+missing=()
+for tool in curl tar; do
+  if ! command -v "$tool" &> /dev/null; then
+    missing+=("$tool")
+  fi
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  apt-get update && apt-get install -y "${missing[@]}" || yum install -y "${missing[@]}" || apk add --no-cache "${missing[@]}"
+fi
+
+asset="pi-linux-${arch}.tar.gz"
+jq_asset="jq-linux-${jq_arch}"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+download() {
+  local url="$1" name="$2" line
+  line="$(awk -v name="$name" '$2 == name { print; exit }' "$here/checksums.txt")"
+  if [ -z "$line" ]; then
+    echo "no sha256 for $name in checksums.txt" >&2
+    return 1
+  fi
+  curl -fsSL --retry 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60 "$url" -o "$work/$name"
+  (cd "$work" && printf '%s\n' "$line" | sha256sum -c -)
+}
+
+mkdir -p "$install_dir"
+
+download "https://github.com/jqlang/jq/releases/download/jq-1.8.2/$jq_asset" "$jq_asset"
+install -m 0755 "$work/$jq_asset" "$install_dir/jq"
+jq="$install_dir/jq"
+
+tag="$("$jq" -r .tag "$here/upstream.json")"
+download "$release/$tag/$asset" "$asset"
+
+rm -rf "$install_dir/pi"
+tar -xzf "$work/$asset" -C "$install_dir" --no-same-owner
+chmod -R a+rX "$install_dir/pi"
+if [ ! -x "$install_dir/pi/pi" ]; then
+  echo "$asset did not contain pi/pi" >&2
+  exit 1
+fi
+
+package="$here/pi/packages/coding-agent/package.json"
+if [ ! -f "$package" ]; then
+  echo "missing $package: the pi submodule was not checked out" >&2
+  exit 1
+fi
+expected="$("$jq" -r .version "$package")"
+installed="$(PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 "$install_dir/pi/pi" --version)" || {
+  echo "$install_dir/pi/pi --version failed" >&2
+  exit 1
+}
+if [ "$installed" != "$expected" ]; then
+  echo "pi version mismatch: installed $installed, submodule $expected" >&2
+  exit 1
+fi
+
+mkdir -p /logs /usr/local/bin
+printf '#!/bin/bash\nexec bash %q "$@"\n' "$here/run.sh" > /usr/local/bin/pi-run
+chmod +x /usr/local/bin/pi-run

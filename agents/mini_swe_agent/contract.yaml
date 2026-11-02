@@ -1,0 +1,16 @@
+name: mini_swe_agent
+install_cmd: bash setup.sh
+run_cmd: >-
+  mini-swe-agent-run "{problem_statement_path}" --model "{model}" --config "{config}"
+  --cost-limit "{cost_limit}" --step-limit "{step_limit}" --cost-tracking "{cost_tracking}"
+final_output: /logs/mini_swe_agent
+output_artifacts:
+  - {path: mini_swe_agent/trajectory.json, source: /logs/mini_swe_agent/trajectory.json, required: false}
+  - {path: mini_swe_agent/summary.json, source: /logs/mini_swe_agent/summary.json, required: false}
+defaults:
+  model: {type: str, required: true, description: "litellm model name, e.g. anthropic/claude-sonnet-4-6"}
+kwargs:
+  config: {type: str, required: false, default: "mini.yaml", description: "mini-swe-agent config; benchmarks/swebench.yaml for SWE-bench"}
+  cost_limit: {type: str, required: false, default: "", description: "USD; empty keeps upstream's default, 0 disables"}
+  step_limit: {type: str, required: false, default: "", description: "Max agent steps; empty keeps upstream's default"}
+  cost_tracking: {type: str, required: false, default: "", description: "Set to ignore_errors for models litellm has no price for"}
