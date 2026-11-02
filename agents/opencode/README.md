@@ -62,16 +62,10 @@ out when there is none; the event's message is never copied, since it can quote 
 
 ## Quirks
 
-- `run.sh` sets three environment flags:
-  - `OPENCODE_DISABLE_AUTOUPDATE=1`, so the version that runs is the pinned one.
-  - `OPENCODE_DISABLE_PROJECT_CONFIG=1`, so the task repo cannot change the agent: its
-    `opencode.json`, `.opencode/` folder and `AGENTS.md`/`CLAUDE.md` files are ignored. The agent's
-    configuration is the model arguments alone.
-  - `OPENCODE_DISABLE_DEFAULT_PLUGINS=1`, which skips opencode's built-in provider plugins (ChatGPT,
-    GitHub Copilot, GitLab, Poe, Cloudflare, Azure, DigitalOcean, Snowflake Cortex, xAI, Cerebras).
-    Those handle sign-in and some provider-specific setup, so a provider that depends on one of them
-    may not work; API-key providers such as `anthropic` do not need them. This was not tried against
-    a live provider.
+- `run.sh` sets one environment flag, `OPENCODE_DISABLE_AUTOUPDATE=1`, so the version that runs is the
+  pinned one. Nothing else about opencode is changed: the task repo's own `opencode.json`, `.opencode/`
+  folder and `AGENTS.md`/`CLAUDE.md` apply exactly as they would if you ran opencode there locally, and
+  opencode's built-in provider plugins are loaded.
 - `OPENCODE_DISABLE_MODELS_FETCH` is not set, so opencode still fetches its model list from
   models.dev on a fresh `HOME`. Whether a run resolves the model without that fetch was not checked.
 - API keys passed with `-s` are environment variables inside the sandbox, so the agent's own commands

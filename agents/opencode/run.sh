@@ -21,11 +21,9 @@ opencode=/opt/opencode/opencode
 logs=/logs/opencode
 mkdir -p "$logs"
 
-# No self-update, no opencode.json (or .opencode/) from the task's repo, no bundled plugins:
-# the agent runs as pinned and configured by the model arguments alone.
+# The only change to opencode's behaviour: no self-update, so the version that runs is the pinned one.
+# Everything else is as upstream ships it, including the task repo's own opencode config.
 export OPENCODE_DISABLE_AUTOUPDATE=1
-export OPENCODE_DISABLE_PROJECT_CONFIG=1
-export OPENCODE_DISABLE_DEFAULT_PLUGINS=1
 
 args=(run -m "$model" --auto --format json)
 if [ -n "$variant" ]; then
