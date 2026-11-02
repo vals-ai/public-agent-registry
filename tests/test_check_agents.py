@@ -466,6 +466,28 @@ def test_check_repo_leaves_an_agents_own_url_to_the_agent_check():
     assert check_agents.check_repo(["agents/x/r"], modules, {"agents/x/r"}) == []
 
 
+def test_check_repo_reports_a_second_entry_for_an_agents_path():
+    # The agent check reads submodule.<path>.url, but git fetches with whichever entry it picks.
+    modules = {
+        "agents/x/r": {"path": "agents/x/r", "url": "https://github.com/o/r.git"},
+        "other": {"path": "agents/x/r", "url": "git@evil.example:o/r.git"},
+    }
+    assert check_agents.check_repo(["agents/x/r"], modules, {"agents/x/r"}) == [
+        ".gitmodules: submodules agents/x/r and other both use path agents/x/r",
+        ".gitmodules: submodule other URL git@evil.example:o/r.git is not https://github.com/<owner>/<repo>",
+    ]
+
+
+def test_check_repo_reports_a_duplicate_path_even_with_https_urls():
+    modules = {
+        "examples/e": {"path": "examples/e", "url": "https://github.com/o/e"},
+        "e2": {"path": "examples/e", "url": "https://github.com/o/e2"},
+    }
+    assert check_agents.check_repo([], modules, {"agents/x/r"}) == [
+        ".gitmodules: submodules examples/e and e2 both use path examples/e"
+    ]
+
+
 def test_read_gitlinks_and_gitmodules(tmp_path):
     git(tmp_path, "init", "-q")
     git(tmp_path, "update-index", "--add", "--cacheinfo", f"160000,{A},agents/x/r")

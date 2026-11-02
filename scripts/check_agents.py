@@ -246,8 +246,9 @@ def check_repo(
     ``agent_submodules`` holds ``agents/<agent>/<submodule>`` for every agent whose upstream.json
     is valid, and ``broken_agents`` the ``agents/<agent>`` folders whose upstream.json is not (they
     are already reported, so the submodules inside them are not reported again). Any other gitlink
-    is a stray submodule. The URL of every .gitmodules entry that is not an agent's submodule must
-    be an HTTPS GitHub repository; an agent's own URL is compared with its upstream.json instead.
+    is a stray submodule. No two .gitmodules entries may share a path. The URL of every entry must be
+    an HTTPS GitHub repository, except an agent's own entry (named after its path, which is the one
+    the agent check reads), whose URL is compared with its upstream.json instead.
     """
     problems = [
         f"{path}: submodule does not belong to an agent "
@@ -255,9 +256,16 @@ def check_repo(
         for path in gitlinks
         if path not in agent_submodules and not any(path.startswith(f"{folder}/") for folder in broken_agents)
     ]
+    owners: dict[str, str] = {}
     for name, fields in modules.items():
+        path = fields.get("path")
+        if path is not None:
+            if path in owners:
+                problems.append(f".gitmodules: submodules {owners[path]} and {name} both use path {path}")
+            else:
+                owners[path] = name
         url = fields.get("url")
-        if url is None or fields.get("path") in agent_submodules:
+        if url is None or (path in agent_submodules and name == path):
             continue
         if not GITHUB_URL.fullmatch(url):
             problems.append(f".gitmodules: submodule {name} URL {url} is not https://github.com/<owner>/<repo>")
