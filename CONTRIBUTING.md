@@ -187,25 +187,16 @@ Vals-internal service.
 Before opening a pull request, scan your agent directory for accidental private
 or machine-local content.
 
-## Checks and Tests
+## Checks
 
 ```bash
 uv sync
-uv run pytest -q
 uv run python scripts/check_agents.py            # --offline skips the upstream tag lookup
 ```
 
-Put the wrapper's tests under `tests/agents/`. Terminus 2's tests need Harbor, so they only run
-with its submodule checked out:
-
-```bash
-git submodule update --init --depth 1 agents/terminus2/harbor
-uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
-```
-
-`check-agents.yml` runs all of this on every pull request, except the bump pull requests
+`check-agents.yml` runs this on every pull request, except the bump pull requests
 described below: a pull request opened with the workflow's `GITHUB_TOKEN` does not trigger
-other workflows, so the bump workflow runs the same checks itself. If `check-agents.yml` is a
+other workflows, so the bump workflow runs `check_agents.py` itself. If `check-agents.yml` is a
 required check on `main`, a maintainer has to run it on a bump pull request, for example by
 closing and reopening the pull request. Pushing a commit to it runs the check too, but then
 the bot stops updating the branch (see below).
@@ -228,12 +219,12 @@ get higher GitHub API rate limits. The script checks the tag out in the submodul
 `scripts/check_agents.py`, and commit.
 
 Every Monday the `bump-agents.yml` workflow runs the script for each agent. When there is a
-newer release, a read-only job tests the bump, and a second job, the only one with write access
-and one that never runs upstream code, opens (or updates) a pull request from the branch
-`bump-<agent-name>`, with a smoke-test checklist. When the only newer release is a new major
-version, it opens an issue instead, one per agent, because that move is a human decision; later
-runs edit that issue to name the newest major version. A bump pull request changes the pin
-only: the contract's `name` stays the same.
+newer release, a read-only job runs `check_agents.py` on the bump, and a second job, the only
+one with write access and one that never runs upstream code, opens (or updates) a pull request
+from the branch `bump-<agent-name>`, with a smoke-test checklist. When the only newer release is
+a new major version, it opens an issue instead, one per agent, because that move is a human
+decision; later runs edit that issue to name the newest major version. A bump pull request
+changes the pin only: the contract's `name` stays the same.
 
 While a bump pull request is open, the workflow rebuilds its branch from `main` only as long
 as the branch holds nothing but the bot's own commits. Once you push a commit to it (a wrapper

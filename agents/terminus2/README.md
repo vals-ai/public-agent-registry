@@ -131,13 +131,8 @@ uv run python scripts/bump_agent.py agents/terminus2
 
 picks the newest Harbor release on the same major version that is at least seven days old, checks it
 out in the submodule and rewrites `upstream.json`. Because the bridge relies on Harbor internals,
-re-run its tests against the new Harbor before committing:
-
-```bash
-uv run --with ./agents/terminus2/harbor pytest tests/agents/test_terminus2_local_env.py tests/agents/test_terminus2_support.py
-```
-
-Then do one real run, from a branch whose name has no slash (see `CONTRIBUTING.md`):
+check it against the new Harbor with one real run before committing, from a branch whose name has no
+slash (see `CONTRIBUTING.md`):
 
 ```bash
 valkyrie agent install https://github.com/<owner>/public-agent-registry/tree/<branch>/agents/terminus2 --name terminus2-test

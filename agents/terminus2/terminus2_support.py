@@ -1,6 +1,6 @@
 """Helpers for run_terminus2.py that do not need Harbor: options, environment, summary, errors.
 
-Kept apart from run_terminus2.py so they can be tested without installing Harbor.
+Kept apart from terminus2_bridge.py, the only module that imports Harbor, so they need no Harbor.
 """
 
 import json

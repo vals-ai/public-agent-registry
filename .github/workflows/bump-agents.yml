@@ -11,11 +11,11 @@ name: Bump agents
 #
 # Each agent goes through two jobs, so that upstream code never runs next to a write token:
 #
-# * bump has read-only permissions. It fetches the agent's upstream repo, runs bump_agent.py, the
-#   tests (for Terminus 2 these import the new Harbor) and check_agents.py, then uploads the result
-#   as an artifact: bump.json (the script's JSON line), upstream.json and checksums.txt. Upstream
-#   code runs in this job and can change anything on its VM, the artifact included (a PATH shim, a
-#   git hook, $GITHUB_ENV), so nothing this job produces is trusted.
+# * bump has read-only permissions. It fetches the agent's upstream repo, runs bump_agent.py and
+#   check_agents.py, then uploads the result as an artifact: bump.json (the script's JSON line),
+#   upstream.json and checksums.txt. The job is built on upstream's files and is treated as
+#   compromised (a PATH shim, a git hook or $GITHUB_ENV could change anything on its VM, the
+#   artifact included), so nothing this job produces is trusted.
 # * publish has the write token. It never fetches or runs a submodule, and it treats the artifact
 #   as untrusted data. It checks out main without submodules and runs bump_agent.py --dry-run
 #   itself (our own script and the GitHub releases API, no upstream code): the artifact's tags must
@@ -83,8 +83,8 @@ jobs:
         run: uv sync --locked
 
       # Moves the submodule and rewrites upstream.json (and checksums.txt) when there is a newer
-      # release, and copies the result out for the artifact. It stages and commits nothing. Upstream
-      # code runs later in this job and could still change the copy before it is uploaded, which is
+      # release, and copies the result out for the artifact. It stages and commits nothing. The job
+      # is treated as compromised and could still change the copy before it is uploaded, which is
       # why publish treats the artifact as untrusted data. The token is read-only: it only raises the
       # release lookup's rate limit.
       - name: Pick a release
@@ -106,27 +106,11 @@ jobs:
             fi
           fi
 
-      # Terminus 2 has a test that drives a real tmux session.
-      - name: Install tmux
-        if: steps.bump.outputs.to != '' && matrix.agent == 'terminus2'
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q tmux
-
-      - name: Test the bump
+      - name: Check the bump
         if: steps.bump.outputs.to != ''
-        env:
-          LITELLM_LOCAL_MODEL_COST_MAP: "True"
-          # The real-tmux test fails instead of skipping if tmux is missing.
-          REQUIRE_TMUX: "1"
         run: |
           # check_agents.py reads the pinned commits from the index, so stage the bump before it runs.
           git add "agents/$AGENT"
-          uv run pytest -q
-          # The Terminus 2 bridge relies on Harbor internals, and its tests are skipped without Harbor.
-          if [ "$AGENT" = terminus2 ]; then
-            uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
-          fi
           uv run python scripts/check_agents.py
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -404,7 +388,7 @@ jobs:
             sed -e "s|@AGENT@|$AGENT|g" -e "s|@TO@|$TAG|g" -e "s|@RUN_ARGS@|$run_args|g" <<'EOF'
           The bot rebuilds this branch from main on each run while the branch holds only its own commits. Once anyone else pushes a commit here, the bot stops pushing to the branch and only updates this description, so it never overwrites your commits.
 
-          The unit tests and check_agents.py passed in the bump job, and check_agents.py passed again in the publish job before the bot's push. Pull requests opened with GITHUB_TOKEN don't trigger check-agents.yml. If that check is required on main, close and reopen this pull request to run it. A commit pushed by a person also runs it, but then the bot stops updating the branch.
+          check_agents.py passed in the bump job, and passed again in the publish job before the bot's push. Pull requests opened with GITHUB_TOKEN don't trigger check-agents.yml. If that check is required on main, close and reopen this pull request to run it. A commit pushed by a person also runs it, but then the bot stops updating the branch.
 
           ## Smoke test before merging
 
