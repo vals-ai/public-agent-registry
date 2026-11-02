@@ -1,19 +1,14 @@
 import hashlib
-import importlib.util
 import io
 import json
 import subprocess
 import urllib.error
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import bump_agent
 import pytest
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "bump_agent.py"
-_spec = importlib.util.spec_from_file_location("bump_agent", SCRIPT)
-bump_agent = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(bump_agent)
 Release = bump_agent.Release
 parse_version = bump_agent.parse_version
 pick_release = bump_agent.pick_release

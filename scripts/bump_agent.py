@@ -177,7 +177,7 @@ def run_git(*args: str, cwd: Path) -> str:
     return result.stdout
 
 
-def _checksum_entry(line: str) -> tuple[str, str] | None:
+def checksum_entry(line: str) -> tuple[str, str] | None:
     """(lowercase sha256, file name) of a ``sha256sum`` line (``*`` and ``./`` tolerated), else None."""
     match = CHECKSUM_LINE.fullmatch(line.strip())
     if not match:
@@ -208,7 +208,7 @@ def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[st
                 raise
             continue
         for line in text.splitlines():
-            entry = _checksum_entry(line)
+            entry = checksum_entry(line)
             if entry and entry[1] in assets:
                 digests.setdefault(entry[1], entry[0])
     for asset in assets:
@@ -219,7 +219,7 @@ def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[st
     kept = []
     if path.is_file():
         for line in path.read_text().splitlines():
-            entry = _checksum_entry(line)
+            entry = checksum_entry(line)
             if line.strip() and not (entry and entry[1] in assets):
                 kept.append(line.rstrip())
     lines = kept + [f"{digests[asset]}  {asset}" for asset in assets]

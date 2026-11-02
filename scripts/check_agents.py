@@ -28,15 +28,12 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 import yaml
+from bump_agent import GITHUB, HEX40, TAG_FORBIDDEN, checksum_entry
 
 ROOT = Path(__file__).resolve().parent.parent
-GITHUB = "https://github.com"
 
-HEX40 = re.compile(r"[0-9a-f]{40}")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 GITHUB_URL = re.compile(re.escape(GITHUB) + "/" + REPO.pattern)
-TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
-CHECKSUM_LINE = re.compile(r"([0-9a-fA-F]{64})\s+\*?(.+)")
 FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
 GIT_TIMEOUT = 60
 
@@ -115,17 +112,6 @@ def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
     return (None, problems) if problems else (upstream, [])
 
 
-def checksum_names(text: str) -> set[str]:
-    """File names that have a sha256 line (``<64 hex>  <name>``, ``*`` and ``./`` tolerated)."""
-    names = set()
-    for line in text.splitlines():
-        match = CHECKSUM_LINE.fullmatch(line.strip())
-        if match:
-            filename = match.group(2).strip()
-            names.add(filename.removeprefix("./"))
-    return names
-
-
 def check_checksums(agent_dir: Path, assets: list[str]) -> list[str]:
     name = agent_dir.name
     if not assets:
@@ -133,7 +119,7 @@ def check_checksums(agent_dir: Path, assets: list[str]) -> list[str]:
     path = agent_dir / "checksums.txt"
     if not path.is_file():
         return [f"{name}: checksums.txt is missing"]
-    present = checksum_names(path.read_text())
+    present = {entry[1] for line in path.read_text().splitlines() if (entry := checksum_entry(line))}
     return [f"{name}: checksums.txt has no sha256 for {asset}" for asset in assets if asset not in present]
 
 

@@ -1,14 +1,10 @@
-import importlib.util
 import json
 import subprocess
 from pathlib import Path
 
+import check_agents
 import pytest
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "check_agents.py"
-_spec = importlib.util.spec_from_file_location("check_agents", SCRIPT)
-check_agents = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(check_agents)
 check_agent = check_agents.check_agent
 
 A = "a" * 40
