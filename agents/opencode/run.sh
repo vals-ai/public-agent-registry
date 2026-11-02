@@ -25,7 +25,10 @@ mkdir -p "$logs"
 # Everything else is as upstream ships it, including the task repo's own opencode config.
 export OPENCODE_DISABLE_AUTOUPDATE=1
 
-args=(run -m "$model" --auto --format json)
+# --print-logs sends opencode's own warnings and errors to stderr.log. Without it a failure such as
+# an unknown model reaches events.jsonl only as "UnknownError: Unexpected server error", and the
+# real reason stays in the sandbox.
+args=(run -m "$model" --auto --format json --print-logs --log-level WARN)
 if [ -n "$variant" ]; then
   args+=(--variant "$variant")
 fi
