@@ -1,0 +1,183 @@
+name: Bump agents
+
+# Every Monday, and on demand, move each agent's upstream pin to the newest release on its tracked
+# line that is at least seven days old (scripts/bump_agent.py) and open or update one pull request
+# per agent from the branch bump-<agent>. The branch name has no slash because Valkyrie's tree URL
+# parser rejects branch names that contain one, and the smoke test installs from this branch.
+#
+# When the only newer release is on a higher major version, the job opens an issue instead: moving
+# across a major version is a human decision.
+#
+# Needs "Allow GitHub Actions to create and approve pull requests" in the repository's
+# Settings > Actions > General. Pull requests opened with GITHUB_TOKEN do not trigger
+# check-agents.yml, so each job runs the same checks before it pushes.
+#
+# The token reaches only the steps that call GitHub (the release lookup, the push, the pull request
+# and the issue). The checkout does not keep it, so the tests, which import the new upstream code
+# for Terminus 2, never see it.
+
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  bump:
+    # Pull requests are opened against main, so only run from there.
+    if: github.ref == 'refs/heads/main'
+    name: Bump ${{ matrix.agent }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [mini_swe_agent, opencode, pi, terminus2]
+    # A manual run during the weekly one would otherwise push the same branch twice at once.
+    concurrency:
+      group: bump-${{ matrix.agent }}
+      cancel-in-progress: false
+    env:
+      AGENT: ${{ matrix.agent }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Fetch the agent's upstream repo
+        run: |
+          submodule=$(jq -r .submodule "agents/$AGENT/upstream.json")
+          git submodule update --init --depth 1 "agents/$AGENT/$submodule"
+
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Moves the submodule and rewrites upstream.json (and checksums.txt) when there is a newer
+      # release; it stages and commits nothing.
+      - name: Pick a release
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          out=$(uv run python scripts/bump_agent.py "agents/$AGENT")
+          echo "$out"
+          {
+            echo "from=$(jq -r '.from' <<<"$out")"
+            echo "to=$(jq -r '.to // ""' <<<"$out")"
+            echo "newer_major=$(jq -r '.newer_major // ""' <<<"$out")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue for a newer major version
+        if: steps.bump.outputs.to == '' && steps.bump.outputs.newer_major != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          MAJOR: ${{ steps.bump.outputs.newer_major }}
+        run: |
+          title="$AGENT: new major version $MAJOR available"
+          # The search is fuzzy, so keep only issues with exactly this title.
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json title |
+            jq --arg title "$title" '[.[] | select(.title == $title)] | length')
+          if [ "$open" -gt 0 ]; then
+            echo "An issue titled \"$title\" is already open."
+            exit 0
+          fi
+          repo=$(jq -r .repo "agents/$AGENT/upstream.json")
+          body=$(printf '%s\n\n%s\n' \
+            "The newest release of \`$repo\` that is at least seven days old and outside the line this registry tracks is \`$MAJOR\`: https://github.com/$repo/releases/tag/$MAJOR. \`agents/$AGENT\` is pinned to \`$FROM\`. The weekly bump stays on the tracked line, so it will not move to \`$MAJOR\` by itself." \
+            "Moving to a new major version is a human decision. Read the release notes and check that the wrapper in \`agents/$AGENT/\` still works. Then run \`uv run python scripts/bump_agent.py agents/$AGENT --pin $MAJOR\`, and update \`track\` in \`upstream.json\` if it sets one.")
+          gh issue create --title "$title" --body "$body"
+
+      - name: Test the bump
+        if: steps.bump.outputs.to != ''
+        env:
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+        run: |
+          git switch -C "bump-$AGENT"
+          # check_agents.py reads the pinned commits from the index, so stage the bump before it runs.
+          git add "agents/$AGENT"
+          uv run pytest -q
+          # The Terminus 2 bridge relies on Harbor internals, and its tests are skipped without Harbor.
+          if [ "$AGENT" = terminus2 ]; then
+            uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
+          fi
+          uv run python scripts/check_agents.py
+
+      - name: Commit and push
+        if: steps.bump.outputs.to != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TO: ${{ steps.bump.outputs.to }}
+        run: |
+          repo=$(jq -r .repo "agents/$AGENT/upstream.json")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bump $AGENT to $TO" -m "Release notes: https://github.com/$repo/releases/tag/$TO"
+          # The branch is rebuilt from main on every run, so it is replaced rather than merged into.
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/bump-$AGENT"
+
+      - name: Open or update the pull request
+        if: steps.bump.outputs.to != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM: ${{ steps.bump.outputs.from }}
+          TO: ${{ steps.bump.outputs.to }}
+          MAJOR: ${{ steps.bump.outputs.newer_major }}
+        run: |
+          repo=$(jq -r .repo "agents/$AGENT/upstream.json")
+          case "$AGENT" in
+            mini_swe_agent) run_args="--benchmark swebench -k config=benchmarks/swebench.yaml" ;;
+            terminus2) run_args="--benchmark terminal-bench --dataset terminal-bench-2.1" ;;
+            *) run_args="--benchmark swebench" ;;
+          esac
+
+          body="$RUNNER_TEMP/pr-body.md"
+          # The backticks in the printf formats are Markdown, not command substitution.
+          # shellcheck disable=SC2016
+          {
+            printf 'Bump `%s` from `%s` to `%s`.\n\n' "$AGENT" "$FROM" "$TO"
+            printf 'Upstream release: https://github.com/%s/releases/tag/%s\n\n' "$repo" "$TO"
+            if [ -n "$MAJOR" ]; then
+              printf 'A newer major version exists: https://github.com/%s/releases/tag/%s. This pull request stays on the tracked line; moving to the new major version is a separate decision.\n\n' "$repo" "$MAJOR"
+            fi
+            sed -e "s|@AGENT@|$AGENT|g" -e "s|@TO@|$TO|g" -e "s|@RUN_ARGS@|$run_args|g" <<'EOF'
+          check_agents.py and the unit tests passed in the bump job (PRs opened with GITHUB_TOKEN don't trigger check-agents.yml).
+
+          ## Smoke test before merging
+
+          Run these with a Valkyrie CLI that meets the minimum version in the README, and your own provider key. The branch name has no slash, so Valkyrie accepts it in a tree URL.
+
+          - [ ] Install the agent from this branch with no GitHub credentials. `--name` keeps the test install from replacing an agent you already have under that name.
+
+            ```bash
+            valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/bump-@AGENT@/agents/@AGENT@ --name @AGENT@-bump-test
+            ```
+
+          - [ ] Run one task.
+
+            ```bash
+            valkyrie run start --agent @AGENT@-bump-test @RUN_ARGS@ --model anthropic/claude-sonnet-4-6 --slice 0:1 -s ANTHROPIC_API_KEY <secret-ref> --connect
+            ```
+
+          - [ ] `valkyrie run results RUN_ID` shows a graded task.
+          - [ ] `valkyrie run artifacts RUN_ID` lists the trajectory and `summary.json`, and `summary.json` names tag `@TO@` and the commit in `upstream.json`.
+          - [ ] Rerun with a secret that holds an invalid API key: `valkyrie run errors RUN_ID` shows a one-line `AgentError: ...` reason.
+          - [ ] Remove the test install: `valkyrie agent remove @AGENT@-bump-test`.
+          EOF
+          } > "$body"
+
+          pr=$(gh pr list --head "bump-$AGENT" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "Bump $AGENT to $TO" --body-file "$body"
+          else
+            gh pr create --base main --head "bump-$AGENT" --title "Bump $AGENT to $TO" --body-file "$body"
+          fi
