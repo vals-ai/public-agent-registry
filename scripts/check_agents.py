@@ -88,8 +88,6 @@ def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
         problems.append(f"{prefix} 'commit' must be a 40-character lowercase hex SHA")
     if not _is_relative_path(upstream.get("submodule")):
         problems.append(f"{prefix} 'submodule' must be a relative path inside the agent folder")
-    if "track" in upstream and not isinstance(upstream["track"], str):
-        problems.append(f"{prefix} 'track' must be a string")
     if "assets" in upstream:
         assets = upstream["assets"]
         if not (isinstance(assets, list) and all(_is_str(asset) for asset in assets)):

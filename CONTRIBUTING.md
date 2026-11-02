@@ -68,7 +68,6 @@ be read inside the sandbox.
 | `tag` | yes | The pinned release tag, a plain version such as `v1.2.3`. |
 | `commit` | yes | The 40-character commit the tag points at. It must equal the submodule's pinned commit. |
 | `submodule` | yes | Path of the submodule inside the agent folder, relative. |
-| `track` | no | The release line the agent follows, as a tag prefix: `"v1."` keeps opencode on 1.x while 2.x exists. Without it, the agent follows its current major version. |
 | `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`: copy it from the release's `SHA256SUMS` (or `sha256sum.txt`) when it has one, otherwise download the asset and run `sha256sum`. Other lines, such as a static `jq`, stay as they are. |
 
 `scripts/check_agents.py` fails if `upstream.json` is malformed, if its commit differs
