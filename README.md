@@ -52,11 +52,6 @@ not trigger the check workflow (see [CONTRIBUTING.md](CONTRIBUTING.md#checks-and
 
 ## Using an Agent
 
-<!-- TODO(min-valkyrie-version): first release with scoped submodule fetch + symlink skipping -->
-Requires Valkyrie CLI ≥ vX.Y.Z: an older CLI clones every agent's upstream
-repository in full on each install, and cannot bundle the agents whose upstream
-repositories contain symlinks (opencode and terminus2).
-
 Install an agent by pointing Valkyrie at the agent directory:
 
 ```bash
