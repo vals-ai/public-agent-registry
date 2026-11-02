@@ -204,7 +204,8 @@ async def run(problem: Path, model: str, options: dict, out_dir: Path) -> int:
         traceback.print_exc()
         name = type(error).__name__
         write_error(f"AgentError: terminus2 {name}")
-        write_summary(out_dir, outcome="error", stop_reason=name, agent_exit_code=1, metrics=metrics_of(context))
-        return 1
-    write_summary(out_dir, outcome="completed", stop_reason="returned", agent_exit_code=0, metrics=metrics_of(context))
-    return 0
+        outcome, stop_reason, code = "error", name, 1
+    else:
+        outcome, stop_reason, code = "completed", "returned", 0
+    write_summary(out_dir, outcome=outcome, stop_reason=stop_reason, agent_exit_code=code, metrics=metrics_of(context))
+    return code
