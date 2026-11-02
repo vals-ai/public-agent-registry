@@ -3,7 +3,7 @@
 Terminus 2, the agent built into [Harbor](https://github.com/harbor-framework/harbor) (Apache-2.0),
 run for Valkyrie exactly as upstream ships it. Terminus 2 has no repository of its own: it is
 `harbor.agents.terminus_2.Terminus2` inside Harbor, so the upstream repository is all of Harbor, the
-`harbor/` git submodule, pinned to tag **v0.25.0** (the commit is in `upstream.json`). Only
+`harbor/` git submodule, pinned to the release recorded in `upstream.json` (`tag` and `commit`). Only
 `contract.yaml`, `setup.sh`, `run_terminus2.py`, `terminus2_bridge.py`, `terminus2_support.py` and
 this README are Vals-authored. Harbor itself is not modified.
 
@@ -17,7 +17,7 @@ valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/mai
 then uv 0.13.5 (checked against a pinned sha256 before it runs), and builds a venv in
 `/opt/terminus2-venv` from Harbor's own `uv.lock` with `uv sync --frozen --no-dev`, so the versions
 are exactly the ones Harbor tested. Its interpreter is a uv-managed Python (the version in
-`harbor/.python-version`, 3.13) in `/opt/terminus2-python`, not the task's own Python, so a task that
+`harbor/.python-version`) in `/opt/terminus2-python`, not the task's own Python, so a task that
 changes the system Python does not break the agent. The only thing it puts on `PATH` is the
 `terminus2-run` entry script, which works from whatever folder Valkyrie copies the agent into. It can
 be run again after a failed attempt. The install takes about 320 MB under `/opt`, and the bundle
@@ -67,7 +67,7 @@ tmux session, because a login shell's profile may move it elsewhere. That `cd` i
 the terminal screen the model sees.
 
 This bridge relies on Harbor internals (`BaseEnvironment`, `TrialPaths`, `AgentContext`, the provider
-table, the tmux session name) that Harbor does not document as a public API. The pin to v0.25.0 holds
+table, the tmux session name) that Harbor does not document as a public API. The pinned release holds
 them still, and every pin bump has to be re-checked (see "Updating").
 
 ## Outputs
@@ -76,7 +76,7 @@ Harbor hardcodes `/logs/agent/` as the agent's log folder (the tmux pane log goe
 wrapper asks), so this agent writes to `/logs/agent/` rather than `/logs/terminus2/`, and it is
 collected as `terminus2/`:
 
-- `trajectory.json`: the whole run in Harbor's ATIF format (`ATIF-v1.8`), written by Terminus 2 after
+- `trajectory.json`: the whole run in Harbor's ATIF format, written by Terminus 2 after
   every turn and once more when the run ends, even when it fails. It is not sanitized, so it holds the
   task text.
 - `summary.json`: `agent`, `upstream` (the contents of `upstream.json`), `outcome` (`completed` or

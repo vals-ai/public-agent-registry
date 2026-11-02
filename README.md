@@ -10,14 +10,15 @@ upstream code is a git submodule inside it, pinned to a release tag.
 
 ## Agents
 
-| Agent | Upstream | Pinned tag | Description |
-| --- | --- | --- | --- |
-| [`mini_swe_agent`](agents/mini_swe_agent/README.md) | [SWE-agent/mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) | `v2.4.6` | The minimal AI software engineering agent from the SWE-agent team. |
-| [`opencode`](agents/opencode/README.md) | [anomalyco/opencode](https://github.com/anomalyco/opencode) | `v1.19.4` | The open source AI coding agent, installed from its release binary. Follows the 1.x line. |
-| [`pi`](agents/pi/README.md) | [earendil-works/pi](https://github.com/earendil-works/pi) | `v1.4.0` | A minimal, extensible agent harness, run in print mode from its release binary. |
-| [`terminus2`](agents/terminus2/README.md) | [harbor-framework/harbor](https://github.com/harbor-framework/harbor) | `v0.25.0` | Terminus 2, the terminal agent built into Harbor, which works through a tmux session. Built for Terminal-Bench. |
+| Agent | Upstream | Description |
+| --- | --- | --- |
+| [`mini_swe_agent`](agents/mini_swe_agent/README.md) | [SWE-agent/mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) | The minimal AI software engineering agent from the SWE-agent team. |
+| [`opencode`](agents/opencode/README.md) | [anomalyco/opencode](https://github.com/anomalyco/opencode) | The open source AI coding agent, installed from its release binary. Follows the 1.x line. |
+| [`pi`](agents/pi/README.md) | [earendil-works/pi](https://github.com/earendil-works/pi) | A minimal, extensible agent harness, run in print mode from its release binary. |
+| [`terminus2`](agents/terminus2/README.md) | [harbor-framework/harbor](https://github.com/harbor-framework/harbor) | Terminus 2, the terminal agent built into Harbor, which works through a tmux session. Built for Terminal-Bench. |
 
-The pinned tag of each agent is in its `upstream.json`, together with the commit.
+Each agent is pinned to an upstream release tag. The `tag` and `commit` are in the agent's
+`agents/<agent-name>/upstream.json`, which the weekly bump pull requests update.
 Each agent's README lists its model names, kwargs, outputs and quirks.
 
 ## Repository Layout

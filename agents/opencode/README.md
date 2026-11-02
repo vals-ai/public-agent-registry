@@ -1,8 +1,8 @@
 # opencode
 
 [opencode](https://github.com/anomalyco/opencode) by Anomaly, run for Valkyrie exactly as upstream
-ships it. The upstream repository is the `opencode/` git submodule, pinned to tag **v1.19.4** (the
-commit is in `upstream.json`). Only `contract.yaml`, `setup.sh`, `run.sh`, `finish.sh`,
+ships it. The upstream repository is the `opencode/` git submodule, pinned to the release recorded in
+`upstream.json` (`tag` and `commit`). Only `contract.yaml`, `setup.sh`, `run.sh`, `finish.sh`,
 `checksums.txt` and this README are Vals-authored.
 
 ## Install
@@ -83,6 +83,6 @@ uv run python scripts/bump_agent.py agents/opencode
 ```
 
 picks the newest `v1.*` upstream release that is at least seven days old, checks it out in the
-submodule, rewrites `upstream.json` and refreshes the sha256 lines in `checksums.txt`. This release has
-no checksum file, so the six Linux tarballs (about 80 MB each) are downloaded and hashed. The jq lines
+submodule, rewrites `upstream.json` and refreshes the sha256 lines in `checksums.txt`. When the release
+has no checksum file, the six Linux tarballs (about 80 MB each) are downloaded and hashed. The jq lines
 in `checksums.txt` are kept.

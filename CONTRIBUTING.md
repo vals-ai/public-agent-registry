@@ -62,7 +62,7 @@ be read inside the sandbox.
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `repo` | yes | The upstream GitHub repository, `owner/name`. |
-| `tag` | yes | The pinned release tag, a plain version such as `v1.4.0` so that `bump_agent.py` can compare it. |
+| `tag` | yes | The pinned release tag, a plain version such as `v1.2.3` so that `bump_agent.py` can compare it. |
 | `commit` | yes | The 40-character commit the tag points at. It must equal the submodule's pinned commit. |
 | `submodule` | yes | Path of the submodule inside the agent folder, relative. |
 | `track` | no | Only releases whose tag starts with this are considered, for example `"v1."` keeps opencode on 1.x while 2.x exists. Without it, only releases with the current tag's major version count. |
@@ -217,7 +217,8 @@ get higher GitHub API rate limits. The script checks the tag out in the submodul
 `scripts/check_agents.py`, and commit.
 
 Every Monday the `bump-agents.yml` workflow runs the script for each agent. When there is a
-newer release it tests the bump and opens (or updates) a pull request from the branch
+newer release, a read-only job tests the bump, and a second job, the only one with write access
+and one that never runs upstream code, opens (or updates) a pull request from the branch
 `bump-<agent-name>`, with a smoke-test checklist. When the only newer release is a new major
 version, it opens an issue instead, because that move is a human decision. A bump pull request
 changes the pin only: the contract's `name` stays the same.

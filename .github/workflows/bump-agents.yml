@@ -5,16 +5,26 @@ name: Bump agents
 # per agent from the branch bump-<agent>. The branch name has no slash because Valkyrie's tree URL
 # parser rejects branch names that contain one, and the smoke test installs from this branch.
 #
-# When the only newer release is on a higher major version, the job opens an issue instead: moving
-# across a major version is a human decision.
+# When the only newer release is on a higher major version, the workflow opens an issue instead:
+# moving across a major version is a human decision.
+#
+# Each agent goes through two jobs, so that upstream code never runs next to a write token:
+#
+# * bump has read-only permissions. It fetches the agent's upstream repo, runs bump_agent.py, the
+#   tests (for Terminus 2 these import the new Harbor) and check_agents.py, then uploads only the
+#   result as an artifact: bump.json (the script's JSON line), upstream.json and checksums.txt.
+#   Code that runs in this job can leave anything behind on its VM (a PATH shim, a git hook,
+#   $GITHUB_ENV), so nothing it produces is trusted.
+# * publish has the write token. It never fetches or runs a submodule: it checks out main without
+#   submodules, takes the artifact as data and checks its shape (upstream.json may only change tag
+#   and commit; checksums.txt only its digests), points the submodule's gitlink at the commit with
+#   git update-index, and runs check_agents.py again. That script reads files and asks GitHub which
+#   commit the tag points at, so a tampered result fails there. Then it commits, pushes and opens
+#   or updates the pull request.
 #
 # Needs "Allow GitHub Actions to create and approve pull requests" in the repository's
 # Settings > Actions > General. Pull requests opened with GITHUB_TOKEN do not trigger
-# check-agents.yml, so each job runs the same checks before it pushes.
-#
-# The token reaches only the steps that call GitHub (the release lookup, the push, the pull request
-# and the issue). The checkout does not keep it, so the tests, which import the new upstream code
-# for Terminus 2, never see it.
+# check-agents.yml, which is why both jobs run the checks themselves.
 
 on:
   schedule:
@@ -22,9 +32,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 jobs:
   bump:
@@ -33,14 +41,12 @@ jobs:
     name: Bump ${{ matrix.agent }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         agent: [mini_swe_agent, opencode, pi, terminus2]
-    # A manual run during the weekly one would otherwise push the same branch twice at once.
-    concurrency:
-      group: bump-${{ matrix.agent }}
-      cancel-in-progress: false
     env:
       AGENT: ${{ matrix.agent }}
     steps:
@@ -62,26 +68,122 @@ jobs:
         run: uv sync
 
       # Moves the submodule and rewrites upstream.json (and checksums.txt) when there is a newer
-      # release; it stages and commits nothing.
+      # release, and copies the result out before any upstream code runs. It stages and commits
+      # nothing. The token is read-only: it only raises the release lookup's rate limit.
       - name: Pick a release
         id: bump
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          out=$(uv run python scripts/bump_agent.py "agents/$AGENT")
-          echo "$out"
+          out="$RUNNER_TEMP/bump-out"
+          mkdir -p "$out"
+          json=$(uv run python scripts/bump_agent.py "agents/$AGENT")
+          echo "$json"
+          printf '%s\n' "$json" > "$out/bump.json"
+          to=$(jq -r '.to // ""' <<<"$json")
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+          if [ -n "$to" ]; then
+            cp "agents/$AGENT/upstream.json" "$out/"
+            if [ -f "agents/$AGENT/checksums.txt" ]; then
+              cp "agents/$AGENT/checksums.txt" "$out/"
+            fi
+          fi
+
+      - name: Test the bump
+        if: steps.bump.outputs.to != ''
+        env:
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+        run: |
+          # check_agents.py reads the pinned commits from the index, so stage the bump before it runs.
+          git add "agents/$AGENT"
+          uv run pytest -q
+          # The Terminus 2 bridge relies on Harbor internals, and its tests are skipped without Harbor.
+          if [ "$AGENT" = terminus2 ]; then
+            uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
+          fi
+          uv run python scripts/check_agents.py
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bump-${{ matrix.agent }}
+          path: ${{ runner.temp }}/bump-out
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  publish:
+    needs: bump
+    # Runs for every agent, even if another agent's bump job failed. An agent whose own bump job
+    # failed has no artifact and is skipped below.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    name: Publish ${{ matrix.agent }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [mini_swe_agent, opencode, pi, terminus2] # keep in step with the bump job
+    # A manual run during the weekly one would otherwise push the same branch twice at once.
+    concurrency:
+      group: bump-${{ matrix.agent }}
+      cancel-in-progress: false
+    env:
+      AGENT: ${{ matrix.agent }}
+    steps:
+      - name: Download the bump result
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bump-${{ matrix.agent }}
+          path: ${{ runner.temp }}/bump
+
+      - name: Skip an agent whose bump job failed
+        if: steps.download.outcome != 'success'
+        run: echo "::warning::No bump result for $AGENT, so there is nothing to publish."
+
+      # Main only, and no submodules: nothing from an upstream repo is ever fetched in this job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.download.outcome == 'success'
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Read the result
+        id: read
+        if: steps.download.outcome == 'success'
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          file="$RUNNER_TEMP/bump/bump.json"
+          if [ ! -f "$file" ] || [ -L "$file" ] || [ "$(wc -c < "$file")" -gt 4096 ]; then
+            fail "bump.json is missing or is not a small regular file"
+          fi
+          version='^v?[0-9]+(\.[0-9]+)*$'
+          agent=$(jq -r '.agent' "$file")
+          to=$(jq -r '.to // ""' "$file")
+          major=$(jq -r '.newer_major // ""' "$file")
+          [ "$agent" = "$AGENT" ] || fail "bump.json is for a different agent"
+          for tag in "$to" "$major"; do
+            if [ -n "$tag" ] && ! [[ $tag =~ $version ]]; then
+              fail "bump.json has a tag that is not a plain version: $tag"
+            fi
+          done
           {
-            echo "from=$(jq -r '.from' <<<"$out")"
-            echo "to=$(jq -r '.to // ""' <<<"$out")"
-            echo "newer_major=$(jq -r '.newer_major // ""' <<<"$out")"
+            echo "from=$(jq -r .tag "agents/$AGENT/upstream.json")"
+            echo "to=$to"
+            echo "newer_major=$major"
           } >> "$GITHUB_OUTPUT"
 
       - name: Open an issue for a newer major version
-        if: steps.bump.outputs.to == '' && steps.bump.outputs.newer_major != ''
+        if: steps.read.outputs.to == '' && steps.read.outputs.newer_major != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          FROM: ${{ steps.bump.outputs.from }}
-          MAJOR: ${{ steps.bump.outputs.newer_major }}
+          FROM: ${{ steps.read.outputs.from }}
+          MAJOR: ${{ steps.read.outputs.newer_major }}
         run: |
           title="$AGENT: new major version $MAJOR available"
           # The search is fuzzy, so keep only issues with exactly this title.
@@ -97,26 +199,65 @@ jobs:
             "Moving to a new major version is a human decision. Read the release notes and check that the wrapper in \`agents/$AGENT/\` still works. Then run \`uv run python scripts/bump_agent.py agents/$AGENT --pin $MAJOR\`, and update \`track\` in \`upstream.json\` if it sets one.")
           gh issue create --title "$title" --body "$body"
 
-      - name: Test the bump
-        if: steps.bump.outputs.to != ''
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        if: steps.read.outputs.to != ''
+        with:
+          enable-cache: false
+
+      # Only our own scripts run from here on: jq, git, and check_agents.py (which needs pyyaml).
+      - name: Install dependencies
+        if: steps.read.outputs.to != ''
+        run: uv sync --no-dev
+
+      # Applies the bump to main's files. The artifact is data: upstream.json may only change its
+      # tag and commit, checksums.txt only its digests, and the submodule path comes from main's
+      # upstream.json. The submodule itself is never fetched, so its new commit is set directly.
+      - name: Apply the bump
+        if: steps.read.outputs.to != ''
         env:
-          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+          TO: ${{ steps.read.outputs.to }}
         run: |
+          fail() { echo "::error::$*"; exit 1; }
+          regular() { [ -f "$1" ] && [ ! -L "$1" ] && [ "$(wc -c < "$1")" -le 65536 ]; }
+          art="$RUNNER_TEMP/bump"
+          dir="agents/$AGENT"
+
+          regular "$art/upstream.json" || fail "upstream.json is missing or is not a small regular file"
+          old=$(jq -S 'del(.tag, .commit)' "$dir/upstream.json")
+          new=$(jq -S 'del(.tag, .commit)' "$art/upstream.json")
+          [ "$old" = "$new" ] || fail "upstream.json changes more than its tag and commit"
+          [ "$(jq -r .tag "$art/upstream.json")" = "$TO" ] || fail "upstream.json is not at the tag in bump.json"
+          commit=$(jq -r .commit "$art/upstream.json")
+          [[ $commit =~ ^[0-9a-f]{40}$ ]] || fail "upstream.json has no 40-character commit"
+          submodule=$(jq -r .submodule "$dir/upstream.json")
+
           git switch -C "bump-$AGENT"
-          # check_agents.py reads the pinned commits from the index, so stage the bump before it runs.
-          git add "agents/$AGENT"
-          uv run pytest -q
-          # The Terminus 2 bridge relies on Harbor internals, and its tests are skipped without Harbor.
-          if [ "$AGENT" = terminus2 ]; then
-            uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
+          cp "$art/upstream.json" "$dir/upstream.json"
+          git add -- "$dir/upstream.json"
+
+          if [ -f "$dir/checksums.txt" ]; then
+            regular "$art/checksums.txt" || fail "checksums.txt is missing or is not a small regular file"
+            if grep -qvE '^[0-9a-fA-F]{64}  [^ ]+$' "$art/checksums.txt"; then
+              fail "checksums.txt has a line that is not '<sha256>  <file name>'"
+            fi
+            names() { awk '{print $2}' "$1" | sort; }
+            [ "$(names "$dir/checksums.txt")" = "$(names "$art/checksums.txt")" ] ||
+              fail "checksums.txt changes more than its digests"
+            cp "$art/checksums.txt" "$dir/checksums.txt"
+            git add -- "$dir/checksums.txt"
           fi
-          uv run python scripts/check_agents.py
+
+          git update-index --add --cacheinfo "160000,$commit,$dir/$submodule"
+
+      - name: Check agents against upstream
+        if: steps.read.outputs.to != ''
+        run: uv run --no-dev python scripts/check_agents.py
 
       - name: Commit and push
-        if: steps.bump.outputs.to != ''
+        if: steps.read.outputs.to != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TO: ${{ steps.bump.outputs.to }}
+          TO: ${{ steps.read.outputs.to }}
         run: |
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           git config user.name "github-actions[bot]"
@@ -126,12 +267,12 @@ jobs:
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/bump-$AGENT"
 
       - name: Open or update the pull request
-        if: steps.bump.outputs.to != ''
+        if: steps.read.outputs.to != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          FROM: ${{ steps.bump.outputs.from }}
-          TO: ${{ steps.bump.outputs.to }}
-          MAJOR: ${{ steps.bump.outputs.newer_major }}
+          FROM: ${{ steps.read.outputs.from }}
+          TO: ${{ steps.read.outputs.to }}
+          MAJOR: ${{ steps.read.outputs.newer_major }}
         run: |
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           case "$AGENT" in
@@ -150,7 +291,7 @@ jobs:
               printf 'A newer major version exists: https://github.com/%s/releases/tag/%s. This pull request stays on the tracked line; moving to the new major version is a separate decision.\n\n' "$repo" "$MAJOR"
             fi
             sed -e "s|@AGENT@|$AGENT|g" -e "s|@TO@|$TO|g" -e "s|@RUN_ARGS@|$run_args|g" <<'EOF'
-          check_agents.py and the unit tests passed in the bump job (PRs opened with GITHUB_TOKEN don't trigger check-agents.yml).
+          The unit tests and check_agents.py passed in the bump job, and check_agents.py passed again in the publish job before the push. PRs opened with GITHUB_TOKEN don't trigger check-agents.yml, so those two jobs are the only checks that have run on this change.
 
           ## Smoke test before merging
 

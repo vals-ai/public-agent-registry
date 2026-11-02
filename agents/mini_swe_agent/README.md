@@ -2,8 +2,8 @@
 
 [mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) by the SWE-agent team, run for Valkyrie
 exactly as upstream ships it. The upstream repository is the `mini-swe-agent/` git submodule, pinned to
-tag **v2.4.6** (the commit is in `upstream.json`). Only `contract.yaml`, `setup.sh`, `run.py` and this
-README are Vals-authored.
+the release recorded in `upstream.json` (`tag` and `commit`). Only `contract.yaml`, `setup.sh`, `run.py`
+and this README are Vals-authored.
 
 ## Install
 

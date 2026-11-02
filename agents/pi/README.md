@@ -1,9 +1,9 @@
 # pi
 
 [pi](https://github.com/earendil-works/pi) by Earendil Works, run for Valkyrie exactly as upstream
-ships it. The upstream repository is the `pi/` git submodule, pinned to tag **v1.4.0** (the commit is
-in `upstream.json`). Only `contract.yaml`, `setup.sh`, `run.sh`, `finish.sh`, `checksums.txt` and this
-README are Vals-authored.
+ships it. The upstream repository is the `pi/` git submodule, pinned to the release recorded in
+`upstream.json` (`tag` and `commit`). Only `contract.yaml`, `setup.sh`, `run.sh`, `finish.sh`,
+`checksums.txt` and this README are Vals-authored.
 
 ## Install
 
