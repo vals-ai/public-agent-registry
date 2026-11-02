@@ -27,9 +27,16 @@ mkdir -p "$logs"
 export PI_SKIP_VERSION_CHECK=1
 export PI_TELEMETRY=0
 
+# MODEL is split on its first / into --provider and --model, as opencode reads it. Passed whole, pi
+# matches a string like deepseek/deepseek-chat against OpenRouter's model ids (which look the same)
+# and then asks for an OpenRouter key. A MODEL without a / goes to pi's own model lookup unchanged.
+if [[ $model == */* ]]; then
+  args=(-p --provider "${model%%/*}" --model "${model#*/}")
+else
+  args=(-p --model "$model")
+fi
 # --no-approve makes explicit what print mode does anyway without a saved decision: the task repo's
 # .pi/ settings, extensions and skills are not loaded.
-args=(-p --model "$model")
 if [ -n "$thinking" ]; then
   args+=(--thinking "$thinking")
 fi

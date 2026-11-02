@@ -34,9 +34,11 @@ valkyrie run start --benchmark swebench --agent pi \
   -k thinking high --concurrency 10 --slice :10
 ```
 
-`--model` is pi's `provider/id` form, for example `anthropic/claude-sonnet-4-6` or `openai/gpt-5`, and
-`pi --list-models` lists them. Use the secret that provider expects (`OPENAI_API_KEY`,
-`GEMINI_API_KEY`, ...).
+`--model` is `provider/id`, for example `anthropic/claude-sonnet-4-6`, `deepseek/deepseek-v4-pro` or
+`openrouter/deepseek/deepseek-chat`, and `pi --list-models` lists them. The wrapper splits it on the
+first `/` into pi's `--provider` and `--model`; passed whole, pi would match an id such as
+`deepseek/deepseek-chat` against OpenRouter's models instead. Use the secret that provider expects
+(`OPENAI_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, ...).
 
 | Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
