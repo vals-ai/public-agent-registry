@@ -53,20 +53,15 @@ if [ "$code" -ne 137 ] && [ -n "$session" ]; then
 fi
 
 exit_code="$code"
+stop_reason="${stop:-unknown}"
 case "$code" in
   0) outcome=completed ;;
-  137) outcome=killed ;;
+  137) outcome=killed; stop_reason=killed ;;
   *) outcome=error ;;
 esac
 if [ "$outcome" = error ] && [ "$stop" = length ]; then
   outcome=completed
   exit_code=0
-fi
-
-if [ "$outcome" = killed ]; then
-  stop_reason=killed
-else
-  stop_reason="${stop:-unknown}"
 fi
 
 write_summary() {

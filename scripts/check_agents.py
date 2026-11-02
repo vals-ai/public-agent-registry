@@ -38,10 +38,6 @@ FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
 GIT_TIMEOUT = 60
 
 
-def _short(sha: str) -> str:
-    return sha[:12]
-
-
 def _is_str(value: object) -> bool:
     return isinstance(value, str) and value != ""
 
@@ -149,8 +145,8 @@ def check_agent(
     else:
         if gitlink != upstream["commit"]:
             problems.append(
-                f"{name}: submodule {submodule} is at {_short(gitlink)}, "
-                f"upstream.json says {_short(upstream['commit'])}"
+                f"{name}: submodule {submodule} is at {gitlink[:12]}, "
+                f"upstream.json says {upstream['commit'][:12]}"
             )
         expected = f"{GITHUB}/{upstream['repo']}"
         if submodule_url is None:
@@ -160,7 +156,7 @@ def check_agent(
 
     if tag_commit is not None and tag_commit != upstream["commit"]:
         problems.append(
-            f"{name}: tag {upstream['tag']} points at {_short(tag_commit)}, not {_short(upstream['commit'])}"
+            f"{name}: tag {upstream['tag']} points at {tag_commit[:12]}, not {upstream['commit'][:12]}"
         )
 
     problems += check_checksums(agent_dir, upstream.get("assets", []))
@@ -169,14 +165,17 @@ def check_agent(
 
 def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
     """Run git and return stdout; None for exit 1 when the caller allows it (key not found)."""
-    result = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=GIT_TIMEOUT,
-        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-    )
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"git {args[0]} timed out after {GIT_TIMEOUT}s") from error
     if result.returncode == 1 and allow_exit_1:
         return None
     if result.returncode != 0:
@@ -266,16 +265,7 @@ def parse_tag_commit(ls_remote_output: str, tag: str) -> str | None:
 
 def fetch_tag_commit(repo: str, tag: str) -> str | None:
     """Resolve ``tag`` in ``repo`` (owner/name) on GitHub to a commit, or None if it does not exist."""
-    try:
-        out = _git(
-            "ls-remote",
-            f"{GITHUB}/{repo}.git",
-            f"refs/tags/{tag}",
-            f"refs/tags/{tag}^{{}}",
-            cwd=ROOT,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"git ls-remote timed out after {GIT_TIMEOUT}s") from error
+    out = _git("ls-remote", f"{GITHUB}/{repo}.git", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}", cwd=ROOT)
     return parse_tag_commit(out, tag)
 
 

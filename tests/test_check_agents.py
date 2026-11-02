@@ -247,6 +247,15 @@ def test_fetch_tag_commit_raises_when_the_remote_cannot_be_read(tmp_path, monkey
         check_agents.fetch_tag_commit("o/missing", "v1.0.0")
 
 
+def test_fetch_tag_commit_reports_a_timeout(monkeypatch):
+    def hang(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(check_agents.subprocess, "run", hang)
+    with pytest.raises(RuntimeError, match=r"^git ls-remote timed out after 60s$"):
+        check_agents.fetch_tag_commit("o/r", "v1.0.0")
+
+
 # Reading gitlinks from the index.
 
 
