@@ -5,22 +5,31 @@ name: Bump agents
 # per agent from the branch bump-<agent>. The branch name has no slash because Valkyrie's tree URL
 # parser rejects branch names that contain one, and the smoke test installs from this branch.
 #
-# When the only newer release is on a higher major version, the workflow opens an issue instead:
-# moving across a major version is a human decision.
+# When the only newer release is on a higher major version, the workflow opens an issue instead,
+# one per agent ("<agent>: new major version available"), and later runs edit it to name the newest
+# major version: moving across a major version is a human decision.
 #
 # Each agent goes through two jobs, so that upstream code never runs next to a write token:
 #
 # * bump has read-only permissions. It fetches the agent's upstream repo, runs bump_agent.py, the
-#   tests (for Terminus 2 these import the new Harbor) and check_agents.py, then uploads only the
-#   result as an artifact: bump.json (the script's JSON line), upstream.json and checksums.txt.
-#   Code that runs in this job can leave anything behind on its VM (a PATH shim, a git hook,
-#   $GITHUB_ENV), so nothing it produces is trusted.
-# * publish has the write token. It never fetches or runs a submodule: it checks out main without
-#   submodules, takes the artifact as data and checks its shape (upstream.json may only change tag
-#   and commit; checksums.txt only its digests), points the submodule's gitlink at the commit with
-#   git update-index, and runs check_agents.py again. That script reads files and asks GitHub which
-#   commit the tag points at, so a tampered result fails there. Then it commits, pushes and opens
-#   or updates the pull request.
+#   tests (for Terminus 2 these import the new Harbor) and check_agents.py, then uploads the result
+#   as an artifact: bump.json (the script's JSON line), upstream.json and checksums.txt. Upstream
+#   code runs in this job and can change anything on its VM, the artifact included (a PATH shim, a
+#   git hook, $GITHUB_ENV), so nothing this job produces is trusted.
+# * publish has the write token. It never fetches or runs a submodule, and it treats the artifact
+#   as untrusted data. It checks out main without submodules and runs bump_agent.py --dry-run
+#   itself (our own script and the GitHub releases API, no upstream code): the artifact's tags must
+#   be the ones that run picks. It writes upstream.json from main's copy with only the tag and
+#   commit changed, takes checksums.txt only if its file names are main's, points the submodule's
+#   gitlink at the commit with git update-index, and runs check_agents.py, which asks GitHub which
+#   commit the tag points at. That proves the tag is the pick and the commit is the tag's. It does
+#   not prove the digests in checksums.txt are those of the release assets: setup.sh checks each
+#   download against them, so a wrong digest makes the install fail, but cannot make it accept a
+#   file the release does not serve. Then it commits, pushes and opens or updates the pull request.
+#
+# While a bump pull request is open, publish leaves its branch alone if the branch is already at
+# the picked tag or if anyone other than the bot has pushed a commit to it, and only refreshes the
+# description, so a maintainer's fixes are never overwritten.
 #
 # Needs "Allow GitHub Actions to create and approve pull requests" in the repository's
 # Settings > Actions > General. Pull requests opened with GITHUB_TOKEN do not trigger
@@ -33,6 +42,11 @@ on:
 
 permissions:
   contents: read
+
+# bash -eo pipefail: a failing command in a pipe fails the step.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   bump:
@@ -62,14 +76,17 @@ jobs:
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: "0.13.5" # the uv that the agents' setup.sh installs
           enable-cache: false
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       # Moves the submodule and rewrites upstream.json (and checksums.txt) when there is a newer
-      # release, and copies the result out before any upstream code runs. It stages and commits
-      # nothing. The token is read-only: it only raises the release lookup's rate limit.
+      # release, and copies the result out for the artifact. It stages and commits nothing. Upstream
+      # code runs later in this job and could still change the copy before it is uploaded, which is
+      # why publish treats the artifact as untrusted data. The token is read-only: it only raises the
+      # release lookup's rate limit.
       - name: Pick a release
         id: bump
         env:
@@ -89,10 +106,19 @@ jobs:
             fi
           fi
 
+      # Terminus 2 has a test that drives a real tmux session.
+      - name: Install tmux
+        if: steps.bump.outputs.to != '' && matrix.agent == 'terminus2'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q tmux
+
       - name: Test the bump
         if: steps.bump.outputs.to != ''
         env:
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
+          # The real-tmux test fails instead of skipping if tmux is missing.
+          REQUIRE_TMUX: "1"
         run: |
           # check_agents.py reads the pinned commits from the index, so stage the bump before it runs.
           git add "agents/$AGENT"
@@ -146,12 +172,14 @@ jobs:
         if: steps.download.outcome != 'success'
         run: echo "::warning::No bump result for $AGENT, so there is nothing to publish."
 
-      # Main only, and no submodules: nothing from an upstream repo is ever fetched in this job.
+      # Main only, and no submodules: nothing from an upstream repo is ever fetched in this job. The
+      # whole history is fetched so that an open bump branch's own commits can be told from main's.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.download.outcome == 'success'
         with:
           submodules: false
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Read the result
         id: read
@@ -178,42 +206,108 @@ jobs:
             echo "newer_major=$major"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Open an issue for a newer major version
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        if: steps.read.outputs.to != '' || steps.read.outputs.newer_major != ''
+        with:
+          version: "0.13.5" # the uv that the agents' setup.sh installs
+          enable-cache: false
+
+      # Only our own scripts run from here on: jq, git, gh, bump_agent.py (standard library only)
+      # and check_agents.py (which needs pyyaml).
+      - name: Install dependencies
+        if: steps.read.outputs.to != '' || steps.read.outputs.newer_major != ''
+        run: uv sync --locked --no-dev
+
+      # Pick again, here, from main's upstream.json and the GitHub releases API. If the bump job's
+      # pick differs, for example because a release turned seven days old between the two jobs,
+      # nothing is published, and the next run picks the release up.
+      - name: Check the pick
+        if: steps.read.outputs.to != '' || steps.read.outputs.newer_major != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TO: ${{ steps.read.outputs.to }}
+          MAJOR: ${{ steps.read.outputs.newer_major }}
+        run: |
+          json=$(uv run --no-dev python scripts/bump_agent.py "agents/$AGENT" --dry-run)
+          echo "$json"
+          to=$(jq -r '.to // ""' <<<"$json")
+          major=$(jq -r '.newer_major // ""' <<<"$json")
+          if [ "$to" != "$TO" ] || [ "$major" != "$MAJOR" ]; then
+            echo "::error::The bump job picked to=${TO:-none} newer_major=${MAJOR:-none}, but bump_agent.py --dry-run picks to=${to:-none} newer_major=${major:-none} now. Nothing is published."
+            exit 1
+          fi
+
+      # One issue per agent, under a title that does not change; its body names the newest major
+      # version, so a later major release edits the issue instead of opening another.
+      - name: Open or update the issue for a newer major version
         if: steps.read.outputs.to == '' && steps.read.outputs.newer_major != ''
         env:
           GH_TOKEN: ${{ github.token }}
           FROM: ${{ steps.read.outputs.from }}
           MAJOR: ${{ steps.read.outputs.newer_major }}
         run: |
-          title="$AGENT: new major version $MAJOR available"
-          # The search is fuzzy, so keep only issues with exactly this title.
-          open=$(gh issue list --state open --search "\"$title\" in:title" --json title |
-            jq --arg title "$title" '[.[] | select(.title == $title)] | length')
-          if [ "$open" -gt 0 ]; then
-            echo "An issue titled \"$title\" is already open."
-            exit 0
-          fi
+          title="$AGENT: new major version available"
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           body=$(printf '%s\n\n%s\n' \
-            "The newest release of \`$repo\` that is at least seven days old and outside the line this registry tracks is \`$MAJOR\`: https://github.com/$repo/releases/tag/$MAJOR. \`agents/$AGENT\` is pinned to \`$FROM\`. The weekly bump stays on the tracked line, so it will not move to \`$MAJOR\` by itself." \
+            "The newest release of \`$repo\` that is at least seven days old and outside the line this registry tracks is \`$MAJOR\`: https://github.com/$repo/releases/tag/$MAJOR. \`agents/$AGENT\` is pinned to \`$FROM\`. The weekly bump stays on the tracked line, so it will not move to \`$MAJOR\` by itself, and it edits this issue when a newer major version comes out." \
             "Moving to a new major version is a human decision. Read the release notes and check that the wrapper in \`agents/$AGENT/\` still works. Then run \`uv run python scripts/bump_agent.py agents/$AGENT --pin $MAJOR\`, and update \`track\` in \`upstream.json\` if it sets one.")
-          gh issue create --title "$title" --body "$body"
+          # The search is fuzzy, so keep only issues with exactly this title, and use the oldest.
+          issue=$(gh issue list --state open --limit 100 --search "\"$title\" in:title" --json number,title |
+            jq -r --arg title "$title" '[.[] | select(.title == $title) | .number] | min // empty')
+          if [ -z "$issue" ]; then
+            gh issue create --title "$title" --body "$body"
+          elif [ "$(gh issue view "$issue" --json body --jq .body)" != "$body" ]; then
+            gh issue edit "$issue" --body "$body"
+          else
+            echo "Issue #$issue already names $MAJOR."
+          fi
 
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      # While a pull request from bump-<agent> is open, the branch is rebuilt only if it holds
+      # nothing but the bot's own commits and is not already at the picked tag. Otherwise it is left
+      # as it is, and only the pull request's description is refreshed, for the tag the branch is at.
+      - name: Check the open pull request
+        id: branch
         if: steps.read.outputs.to != ''
-        with:
-          enable-cache: false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TO: ${{ steps.read.outputs.to }}
+        run: |
+          bot="github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          version='^v?[0-9]+(\.[0-9]+)*$'
+          # Only a pull request from this repository's own branch, not a fork's branch of the same name.
+          pr=$(gh pr list --head "bump-$AGENT" --state open --json number,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not) | .number][0] // empty')
+          push=true
+          tag="$TO"
+          lease=""
+          if [ -n "$pr" ]; then
+            git fetch --no-tags "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/heads/bump-$AGENT"
+            lease=$(git rev-parse FETCH_HEAD)
+            branch_tag=$(git show "FETCH_HEAD:agents/$AGENT/upstream.json" | jq -r '.tag // ""') || branch_tag=""
+            [[ $branch_tag =~ $version ]] || branch_tag=""
+            others=$(git log --format='%an <%ae>' HEAD..FETCH_HEAD | awk -v bot="$bot" '$0 != bot { n++ } END { print n + 0 }')
+            if [ "$branch_tag" = "$TO" ]; then
+              push=false
+              echo "bump-$AGENT is already at $TO, so it is left as it is."
+            elif [ "$others" -gt 0 ]; then
+              push=false
+              tag="$branch_tag"
+              echo "::warning::bump-$AGENT has $others commit(s) the bot did not make, so it is left at ${branch_tag:-a tag that cannot be read} instead of moving to $TO."
+            fi
+          fi
+          {
+            echo "pr=$pr"
+            echo "push=$push"
+            echo "tag=$tag"
+            echo "lease=$lease"
+          } >> "$GITHUB_OUTPUT"
 
-      # Only our own scripts run from here on: jq, git, and check_agents.py (which needs pyyaml).
-      - name: Install dependencies
-        if: steps.read.outputs.to != ''
-        run: uv sync --no-dev
-
-      # Applies the bump to main's files. The artifact is data: upstream.json may only change its
-      # tag and commit, checksums.txt only its digests, and the submodule path comes from main's
-      # upstream.json. The submodule itself is never fetched, so its new commit is set directly.
+      # Applies the bump to main's files. The artifact is data: its upstream.json must equal main's
+      # apart from the tag and commit, and only the commit is taken from it; checksums.txt may only
+      # change its digests. The submodule path comes from main's upstream.json. The submodule itself
+      # is never fetched, so its new commit is set directly.
       - name: Apply the bump
-        if: steps.read.outputs.to != ''
+        if: steps.read.outputs.to != '' && steps.branch.outputs.push == 'true'
         env:
           TO: ${{ steps.read.outputs.to }}
         run: |
@@ -232,7 +326,8 @@ jobs:
           submodule=$(jq -r .submodule "$dir/upstream.json")
 
           git switch -C "bump-$AGENT"
-          cp "$art/upstream.json" "$dir/upstream.json"
+          jq --arg tag "$TO" --arg commit "$commit" '.tag = $tag | .commit = $commit' "$dir/upstream.json" > "$RUNNER_TEMP/upstream.json"
+          mv "$RUNNER_TEMP/upstream.json" "$dir/upstream.json"
           git add -- "$dir/upstream.json"
 
           if [ -f "$dir/checksums.txt" ]; then
@@ -250,29 +345,40 @@ jobs:
           git update-index --add --cacheinfo "160000,$commit,$dir/$submodule"
 
       - name: Check agents against upstream
-        if: steps.read.outputs.to != ''
+        if: steps.read.outputs.to != '' && steps.branch.outputs.push == 'true'
         run: uv run --no-dev python scripts/check_agents.py
 
       - name: Commit and push
-        if: steps.read.outputs.to != ''
+        if: steps.read.outputs.to != '' && steps.branch.outputs.push == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TO: ${{ steps.read.outputs.to }}
+          LEASE: ${{ steps.branch.outputs.lease }}
         run: |
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Bump $AGENT to $TO" -m "Release notes: https://github.com/$repo/releases/tag/$TO"
-          # The branch is rebuilt from main on every run, so it is replaced rather than merged into.
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/bump-$AGENT"
+          # The branch is rebuilt from main, so it is replaced rather than merged into. With an open
+          # pull request, the push only goes through if the branch is still where the previous check
+          # saw it, so a commit pushed in between is not overwritten either.
+          if [ -n "$LEASE" ]; then
+            force="--force-with-lease=refs/heads/bump-$AGENT:$LEASE"
+          else
+            force="--force"
+          fi
+          git push "$force" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/bump-$AGENT"
 
       - name: Open or update the pull request
-        if: steps.read.outputs.to != ''
+        if: steps.read.outputs.to != '' && steps.branch.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           FROM: ${{ steps.read.outputs.from }}
           TO: ${{ steps.read.outputs.to }}
           MAJOR: ${{ steps.read.outputs.newer_major }}
+          PR: ${{ steps.branch.outputs.pr }}
+          PUSHED: ${{ steps.branch.outputs.push }}
+          TAG: ${{ steps.branch.outputs.tag }} # the tag the branch is at after this run
         run: |
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           case "$AGENT" in
@@ -285,22 +391,28 @@ jobs:
           # The backticks in the printf formats are Markdown, not command substitution.
           # shellcheck disable=SC2016
           {
-            printf 'Bump `%s` from `%s` to `%s`.\n\n' "$AGENT" "$FROM" "$TO"
-            printf 'Upstream release: https://github.com/%s/releases/tag/%s\n\n' "$repo" "$TO"
+            printf 'Bump `%s` from `%s` to `%s`.\n\n' "$AGENT" "$FROM" "$TAG"
+            printf 'Upstream release: https://github.com/%s/releases/tag/%s\n\n' "$repo" "$TAG"
+            if [ "$TAG" != "$TO" ]; then
+              printf 'A newer release is out: https://github.com/%s/releases/tag/%s. This branch has commits that the bot did not make, so the bot left it at `%s`. Merge or close this pull request and the next run moves on to the newer release, or move this branch yourself with `uv run python scripts/bump_agent.py agents/%s --pin %s`.\n\n' "$repo" "$TO" "$TAG" "$AGENT" "$TO"
+            fi
             if [ -n "$MAJOR" ]; then
               printf 'A newer major version exists: https://github.com/%s/releases/tag/%s. This pull request stays on the tracked line; moving to the new major version is a separate decision.\n\n' "$repo" "$MAJOR"
             fi
-            sed -e "s|@AGENT@|$AGENT|g" -e "s|@TO@|$TO|g" -e "s|@RUN_ARGS@|$run_args|g" <<'EOF'
-          The unit tests and check_agents.py passed in the bump job, and check_agents.py passed again in the publish job before the push. PRs opened with GITHUB_TOKEN don't trigger check-agents.yml, so those two jobs are the only checks that have run on this change.
+            sed -e "s|@AGENT@|$AGENT|g" -e "s|@TO@|$TAG|g" -e "s|@RUN_ARGS@|$run_args|g" <<'EOF'
+          The bot rebuilds this branch from main on each run while the branch holds only its own commits. Once anyone else pushes a commit here, the bot stops pushing to the branch and only updates this description, so it never overwrites your commits.
+
+          The unit tests and check_agents.py passed in the bump job, and check_agents.py passed again in the publish job before the bot's push. Pull requests opened with GITHUB_TOKEN don't trigger check-agents.yml. If that check is required on main, close and reopen this pull request to run it. A commit pushed by a person also runs it, but then the bot stops updating the branch.
 
           ## Smoke test before merging
 
           Run these with a Valkyrie CLI that meets the minimum version in the README, and your own provider key. The branch name has no slash, so Valkyrie accepts it in a tree URL.
 
-          - [ ] Install the agent from this branch with no GitHub credentials. `--name` keeps the test install from replacing an agent you already have under that name.
+          - [ ] Install the agent from this branch the way an outside user would, with no GitHub credentials: the variables keep git from using your saved credentials and config. `--name` keeps the test install from replacing an agent you already have under that name.
 
             ```bash
-            valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/bump-@AGENT@/agents/@AGENT@ --name @AGENT@-bump-test
+            env -u GH_TOKEN -u GITHUB_TOKEN GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 \
+              valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/bump-@AGENT@/agents/@AGENT@ --name @AGENT@-bump-test
             ```
 
           - [ ] Run one task.
@@ -316,9 +428,10 @@ jobs:
           EOF
           } > "$body"
 
-          pr=$(gh pr list --head "bump-$AGENT" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$pr" ]; then
-            gh pr edit "$pr" --title "Bump $AGENT to $TO" --body-file "$body"
+          if [ -z "$PR" ]; then
+            gh pr create --base main --head "bump-$AGENT" --title "Bump $AGENT to $TAG" --body-file "$body"
+          elif [ "$PUSHED" = true ]; then
+            gh pr edit "$PR" --title "Bump $AGENT to $TAG" --body-file "$body"
           else
-            gh pr create --base main --head "bump-$AGENT" --title "Bump $AGENT to $TO" --body-file "$body"
+            gh pr edit "$PR" --body-file "$body"
           fi

@@ -71,6 +71,8 @@ be read inside the sandbox.
 `scripts/check_agents.py` fails if `upstream.json` is malformed, if its commit differs
 from the submodule's, if the tag does not resolve to that commit upstream, if the
 submodule URL is not `https://github.com/<repo>`, or if an asset has no checksum line.
+It also fails on any submodule that is not an agent's `agents/<agent>/<submodule>`, and
+on any `.gitmodules` URL that is not `https://github.com/<owner>/<repo>`.
 
 ### Pick a release at least seven days old
 
@@ -99,7 +101,9 @@ auto-update, a version check, a first-run wizard), and the agent's README says w
   the task's interpreter.
 - Make it safe to run again: Valkyrie retries a failed install in the same sandbox.
 - Check anything you download against a pinned sha256 (`checksums.txt`, or the digest of a
-  pinned installer). Python installs pass `--exclude-newer "7 days"`.
+  pinned installer). Python installs pass `--exclude-newer "7 days"`, unless they install
+  from the upstream project's own lock file, which already fixes every version: Terminus 2
+  runs `uv sync --frozen` on Harbor's `uv.lock` instead.
 - `install_cmd` gets ten minutes. A bundle can hold at most 1 GB, 5 GB unpacked and 100,000
   files, and symlinks in it are left out of the upload.
 
@@ -112,8 +116,9 @@ for supported fields and examples.
 - `name` is the folder name.
 - `defaults.model` is required, written in the agent's own model syntax. The README gives
   an example for the common providers.
-- `final_output` is `/logs/<agent>`, and `output_artifacts` lists the trajectory and
-  `summary.json` so they can be read without extracting the archive.
+- `final_output` is usually `/logs/<agent>`. Terminus 2 uses `/logs/agent`, because Harbor
+  hardcodes that folder. `output_artifacts` lists the trajectory and `summary.json` so they
+  can be read without extracting the archive.
 - Do not add a `secrets` block. Users pass their own keys with
   `-s ENV_VAR <secret-ref>`, and the README names the variables the agent reads.
 
@@ -142,8 +147,9 @@ exit code decides whether the sandbox is graded:
   `summary.json`.
 - The agent was killed (137): exit 137.
 - The agent could not really run (a bad or missing API key, an unknown model, a crash): write
-  a one-line `Type: message` reason to `$VALKYRIE_ERROR_PATH` and exit nonzero. Never put the
-  task, a prompt or model output in that line, and copy only error names, not messages.
+  one line starting with `AgentError: ` to `$VALKYRIE_ERROR_PATH`, for example
+  `AgentError: <agent> <ExceptionClass>`, and exit nonzero. Never put the task, a prompt or
+  model output in that line, and copy only error names, not messages.
 
 ## README Requirements
 
@@ -154,7 +160,7 @@ Each agent README should include (to make the agent easy to use):
   are readable by the agent's own commands inside the sandbox
 - Usage through Valkyrie, with the model name format and the kwargs
 - The output files and how a run ends (exit codes)
-- The pinned tag and how to update it
+- How to update the pin. The README does not repeat the tag: `upstream.json` records it
 
 ### Example commands:
 
@@ -197,7 +203,12 @@ git submodule update --init --depth 1 agents/terminus2/harbor
 uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
 ```
 
-`check-agents.yml` runs all of this on every pull request.
+`check-agents.yml` runs all of this on every pull request, except the bump pull requests
+described below: a pull request opened with the workflow's `GITHUB_TOKEN` does not trigger
+other workflows, so the bump workflow runs the same checks itself. If `check-agents.yml` is a
+required check on `main`, a maintainer has to run it on a bump pull request, for example by
+closing and reopening the pull request. Pushing a commit to it runs the check too, but then
+the bot stops updating the branch (see below).
 
 ## Updating an Agent
 
@@ -220,21 +231,28 @@ Every Monday the `bump-agents.yml` workflow runs the script for each agent. When
 newer release, a read-only job tests the bump, and a second job, the only one with write access
 and one that never runs upstream code, opens (or updates) a pull request from the branch
 `bump-<agent-name>`, with a smoke-test checklist. When the only newer release is a new major
-version, it opens an issue instead, because that move is a human decision. A bump pull request
-changes the pin only: the contract's `name` stays the same.
+version, it opens an issue instead, one per agent, because that move is a human decision; later
+runs edit that issue to name the newest major version. A bump pull request changes the pin
+only: the contract's `name` stays the same.
+
+While a bump pull request is open, the workflow rebuilds its branch from `main` only as long
+as the branch holds nothing but the bot's own commits. Once you push a commit to it (a wrapper
+fix, say), later runs leave the branch alone and only refresh the description, which then
+names any newer release. Merge or close the pull request to let the bot move on.
 
 ## Before opening a pr
 
 Before contributing, run through the process of how an external user would install and run your agent. Doing a pass before opening a pr will save time and ensure that everything is working.
 
 Valkyrie's tree URL parser rejects branch names that contain a slash, so test from a branch
-whose name has none. Push your work to one, with no GitHub credentials configured to see what
-an outside user sees, and use `--name` so the test install does not replace an agent you
-already have:
+whose name has none. Push your work to one, then install it the way an outside user would,
+with no GitHub credentials: the variables below keep git from using your saved credentials
+and config, and `--name` keeps the test install from replacing an agent you already have:
 
 ```bash
 git push origin <your-branch>:<agent-name>-test
-valkyrie agent install https://github.com/<owner>/public-agent-registry/tree/<agent-name>-test/agents/<agent-name> --name <agent-name>-test
+env -u GH_TOKEN -u GITHUB_TOKEN GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 \
+  valkyrie agent install https://github.com/<owner>/public-agent-registry/tree/<agent-name>-test/agents/<agent-name> --name <agent-name>-test
 ```
 
 Then run one task:

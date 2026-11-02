@@ -444,8 +444,13 @@ def test_main_default_upstream_is_the_shipped_file():
 
 @pytest.fixture
 def private_tmux(monkeypatch):
-    """Point tmux at a private socket folder so no tmux server of the user's is touched."""
+    """Point tmux at a private socket folder so no tmux server of the user's is touched.
+
+    Skips without tmux, unless REQUIRE_TMUX is set (CI sets it after installing tmux): then it fails.
+    """
     if shutil.which("tmux") is None:
+        if os.environ.get("REQUIRE_TMUX"):
+            pytest.fail("REQUIRE_TMUX is set, but tmux is not installed")
         pytest.skip("needs tmux")
     socket_dir = tempfile.mkdtemp(prefix="t2-")  # short: tmux socket paths are length-limited
     monkeypatch.setenv("TMUX_TMPDIR", socket_dir)

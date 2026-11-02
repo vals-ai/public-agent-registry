@@ -45,8 +45,10 @@ agents/<agent-name>/
 
 See the [contract documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md)
 for the fields `contract.yaml` supports. A weekly workflow opens one pull request
-per agent when upstream has a newer release that is at least seven days old, and
-every pull request is checked against `upstream.json` and the upstream tags.
+per agent when upstream has a newer release that is at least seven days old. Every
+pull request is checked against `upstream.json` and the upstream tags: the weekly
+workflow checks its own pull requests itself, because a pull request it opens does
+not trigger the check workflow (see [CONTRIBUTING.md](CONTRIBUTING.md#checks-and-tests)).
 
 ## Using an Agent
 

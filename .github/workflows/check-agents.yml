@@ -17,6 +17,11 @@ concurrency:
   group: check-agents-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# bash -eo pipefail: a failing command in a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -31,17 +36,27 @@ jobs:
         run: git submodule update --init --depth 1 agents/terminus2/harbor
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.5" # the uv that the agents' setup.sh installs
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Unit tests
         run: uv run pytest -q
+
+      # Terminus 2 has a test that drives a real tmux session.
+      - name: Install tmux
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q tmux
 
       - name: Terminus 2 tests against Harbor
         env:
           # Keep litellm from fetching its model price map over the network.
           LITELLM_LOCAL_MODEL_COST_MAP: "True"
+          # The real-tmux test fails instead of skipping if tmux is missing.
+          REQUIRE_TMUX: "1"
         run: uv run --with ./agents/terminus2/harbor pytest -q tests/agents/test_terminus2_local_env.py
 
       - name: Check agents against upstream

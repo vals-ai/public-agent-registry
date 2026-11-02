@@ -11,6 +11,8 @@
 
 <!-- What changed and why. Include user-facing behavior changes. -->
 
+## Checklist
+
 - [ ] `upstream.json` matches the submodule (repo, tag and commit), and `checksums.txt` is refreshed if the agent has `assets`.
 - [ ] `scripts/check_agents.py` passes.
 - [ ] The new tag is the newest release that is at least seven days old, or the reason it is not is below.
