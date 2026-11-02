@@ -18,10 +18,7 @@ contributions will not be accepted.
 
 ## Agents
 
-- [terminus2](agents/terminus2-v1.0.0): Terminus 2 terminal-based agent for
-  containerized benchmark tasks.
-- [mini_sweagent-v1.0.0](agents/mini_sweagent-v1.0.0): Mini SWE-agent
-  for SWE-bench tasks, packaged with the public model library.
+Agents taken directly from their upstream projects (mini-swe-agent, opencode, pi, Terminus 2) are coming soon.
 
 ## Agent Directory Shape
 
@@ -60,7 +57,6 @@ See `examples/` for working contracts:
 
 - [codex-v1.0.0](examples/codex-v1.0.0/README.md)
 - [claude_code-v1.0.0](examples/claude_code-v1.0.0/README.md)
-- [mini_sweagent-v1.0.0](examples/mini_sweagent-v1.0.0/README.md)
 
 These examples show common setup patterns, output collection, and README
 structure.
