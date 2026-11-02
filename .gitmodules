@@ -2,3 +2,7 @@
 	path = agents/mini_swe_agent/mini-swe-agent
 	url = https://github.com/SWE-agent/mini-swe-agent.git
 	shallow = true
+[submodule "agents/opencode/opencode"]
+	path = agents/opencode/opencode
+	url = https://github.com/anomalyco/opencode.git
+	shallow = true

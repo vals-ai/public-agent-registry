@@ -1,0 +1,11 @@
+name: opencode
+install_cmd: bash setup.sh
+run_cmd: opencode-run "{problem_statement_path}" "{model}" "{variant}"
+final_output: /logs/opencode
+output_artifacts:
+  - {path: opencode/session.json, source: /logs/opencode/session.json, required: false}
+  - {path: opencode/summary.json, source: /logs/opencode/summary.json, required: false}
+defaults:
+  model: {type: str, required: true, description: "provider/model, e.g. anthropic/claude-sonnet-4-6"}
+kwargs:
+  variant: {type: str, required: false, default: "", description: "Reasoning effort (e.g. high); empty keeps the provider default"}
