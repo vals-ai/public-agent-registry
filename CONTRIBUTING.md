@@ -89,7 +89,7 @@ and copies the agent's own logs to `/logs`. It does not change how the agent beh
 prompts, tools, step loops and limits stay at upstream's defaults unless the user passes a
 kwarg. Do not patch the submodule. An environment variable the wrapper sets should only
 switch off something that breaks a non-interactive run or changes which version runs (an
-auto-update, a version check, a first-run wizard), and the agent's README says which ones.
+auto-update, a version check, a first-run wizard).
 
 ### setup.sh
 
@@ -153,14 +153,17 @@ exit code decides whether the sandbox is graded:
 
 ## README Requirements
 
-Each agent README should include (to make the agent easy to use):
+Each agent README covers usage only; how the wrapper works belongs in its code and in this
+guide. It includes:
 
-- Installation instructions
-- Any secrets required to run the agent, as `-s ENV_VAR <secret-ref>`, and a note that keys
-  are readable by the agent's own commands inside the sandbox
-- Usage through Valkyrie, with the model name format and the kwargs
-- The output files and how a run ends (exit codes)
-- How to update the pin. The README does not repeat the tag: `upstream.json` records it
+- What the agent is, with a link to its upstream project
+- Configuration: the secrets it reads (passed as `-s ENV_VAR <secret-ref>`), the model name
+  format with an example, the final output path, the kwargs, and any constraint that changes
+  how it is used (for example, a glibc-based task image)
+- Usage through Valkyrie: the install and run commands
+- The output files
+
+The README does not repeat the pinned tag: `upstream.json` records it.
 
 ### Example commands:
 

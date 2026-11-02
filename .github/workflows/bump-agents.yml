@@ -323,7 +323,7 @@ jobs:
 
           ## Smoke test before merging
 
-          Run these with a Valkyrie CLI that meets the minimum version in the README, and your own provider key. The branch name has no slash, so Valkyrie accepts it in a tree URL.
+          Run these with a Valkyrie CLI that leaves symlinks out of agent bundles and fetches only the requested folder's submodules, and your own provider key. The branch name has no slash, so Valkyrie accepts it in a tree URL.
 
           - [ ] Install the agent from this branch the way an outside user would, with no GitHub credentials: the variables keep git from using your saved credentials and config. `--name` keeps the test install from replacing an agent you already have under that name.
 
