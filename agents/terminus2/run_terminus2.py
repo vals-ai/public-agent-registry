@@ -1,25 +1,4 @@
 #!/usr/bin/env python3
-"""Run Harbor's Terminus 2 on one problem statement and write summary.json.
-
-Usage: run_terminus2.py PROBLEM --model M [--max-turns N] [--temperature T] [--parser json|xml]
-                        [--reasoning-effort E] [--output-dir D]
-
-PROBLEM is the path of a file holding the task. Empty option values keep upstream's defaults. The
-agent runs from the current folder, the benchmark's working directory. How Terminus 2 is run on
-this machine is in terminus2_bridge.py, the only module that imports Harbor. It is imported inside
-``main``'s error handling, so even a Harbor that cannot be imported ends with summary.json and an
-error line.
-
-Outputs: Terminus 2 writes ``trajectory.json`` to the output directory (default /logs/agent, which
-is also where Harbor writes the tmux pane log, ``terminus_2.pane``). This script adds
-``summary.json`` there, always, even when the run fails.
-
-Exit code: 0 when Terminus 2's ``run`` returns (the task was confirmed complete, ``max_turns`` was
-reached, or the tmux session ended). Otherwise 1, with ``AgentError: terminus2 <ExceptionClass>``
-in $VALKYRIE_ERROR_PATH (or ``AgentError: terminus2 <option> must be ...`` for a kwarg that does not
-parse). That line never holds task or model text.
-"""
-
 import argparse
 import asyncio
 import sys
@@ -51,7 +30,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def fail(out_dir: Path, line: str, stop_reason: str) -> int:
-    """Report a run that ended before Terminus 2 could record anything: error line, summary, exit 1."""
     write_error(line)
     write_summary(out_dir, outcome="error", stop_reason=stop_reason, agent_exit_code=1, metrics=no_metrics())
     return 1

@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""Pick or set the pinned upstream release of an agent under agents/.
-
-Each agents/<name>/ wraps an unmodified upstream repo, pinned as a git submodule, and records
-the pin in upstream.json (``repo``, ``tag``, ``commit``, ``submodule``, and optionally ``track``
-and ``assets``). This script moves that pin:
-
-* without --pin it picks the newest GitHub release that is at least seven days old and on the
-  tracked line (the tag starts with ``track`` if set, else it has the same major version as the
-  current tag). Drafts and prereleases never count,
-* with --pin TAG it pins that tag, whatever its age. This is how the first pin is set right after
-  ``git submodule add``, when upstream.json still has an empty ``tag`` and ``commit``.
-
-Pinning checks the tag out in the submodule, rewrites upstream.json, and, when ``assets`` is set,
-rewrites checksums.txt with the release's sha256 for each asset. It stages nothing: the caller
-runs ``git add`` and commits.
-
-Usage: python scripts/bump_agent.py AGENT_DIR [--pin TAG] [--dry-run]
-Prints one JSON line: {"agent", "from", "to", "newer_major"}. ``to`` is the tag picked (or given
-with --pin) and ``newer_major`` the newest old-enough release on a higher major version, both
-null when there is none. --pin does not look up releases, so its ``newer_major`` is null.
-Exits 1 with a message on stderr when something goes wrong.
-
-Set GITHUB_TOKEN to authenticate the GitHub API calls (higher rate limits).
-"""
-
 import argparse
 import hashlib
 import json
@@ -60,7 +35,6 @@ class Release:
 
 
 def parse_version(tag: str) -> tuple[int, ...] | None:
-    """``v1.19.5`` -> ``(1, 19, 5)``. None unless the tag is an optional ``v`` and a dotted number."""
     number = tag.removeprefix("v")
     if not VERSION.fullmatch(number):
         return None
@@ -78,7 +52,6 @@ def _current_version(current_tag: str) -> tuple[int, ...]:
 
 
 def _old_enough(releases: list[Release], now: datetime) -> list[tuple[tuple[int, ...], Release]]:
-    """(version, release) for every release with a plain version tag that is at least ``MIN_AGE`` old."""
     found = []
     for release in releases:
         version = parse_version(release.tag)
@@ -94,10 +67,6 @@ def pick_release(
     track: str | None,
     now: datetime,
 ) -> Release | None:
-    """The highest-version release newer than ``current_tag`` and old enough, on the tracked line.
-
-    The line is the tags starting with ``track`` when it is set, else the current tag's major version.
-    """
     current = _current_version(current_tag)
     candidates = [
         (version, release)
@@ -108,17 +77,12 @@ def pick_release(
 
 
 def newer_major(releases: list[Release], current_tag: str, *, now: datetime) -> Release | None:
-    """The highest-version old-enough release whose major version is above ``current_tag``'s."""
     current = _current_version(current_tag)
     candidates = [(version, release) for version, release in _old_enough(releases, now) if version[0] > current[0]]
     return max(candidates, key=lambda pair: pair[0])[1] if candidates else None
 
 
 def fetch_releases(repo: str) -> list[Release]:
-    """Every published, non-prerelease GitHub release of ``repo`` (owner/name), in the API's order.
-
-    The order is not relied on: callers compare versions, not positions.
-    """
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -144,14 +108,12 @@ def fetch_releases(repo: str) -> list[Release]:
 
 
 def download_bytes(url: str) -> bytes:
-    """GET ``url`` (following redirects). Raises ``urllib.error.HTTPError`` on a bad status."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
         return response.read()
 
 
 def run_git(*args: str, cwd: Path) -> str:
-    """Run git in ``cwd`` (a submodule checkout) and return stdout."""
     if not (cwd / ".git").exists():
         raise RuntimeError(f"{cwd} is not a git checkout; run 'git submodule update --init' first")
     try:
@@ -171,7 +133,6 @@ def run_git(*args: str, cwd: Path) -> str:
 
 
 def checksum_entry(line: str) -> tuple[str, str] | None:
-    """(lowercase sha256, file name) of a ``sha256sum`` line (``*`` and ``./`` tolerated), else None."""
     match = CHECKSUM_LINE.fullmatch(line.strip())
     if not match:
         return None
@@ -179,12 +140,6 @@ def checksum_entry(line: str) -> tuple[str, str] | None:
 
 
 def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[str], bytes]) -> None:
-    """Rewrite checksums.txt with the release's sha256 for each of ``upstream["assets"]``.
-
-    The digests come from the release's SHA256SUMS, then sha256sum.txt, and any asset neither
-    file lists is downloaded and hashed. Lines for other files (jq) stay first, in their order,
-    then come the assets, in ``assets`` order. Nothing is written if a download fails.
-    """
     assets = upstream["assets"]
     base = f"{GITHUB}/{upstream['repo']}/releases/download/{upstream['tag']}"
 
@@ -218,11 +173,6 @@ def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[st
 
 
 def pin(agent_dir: Path, tag: str, *, git: Callable[..., str], download: Callable[[str], bytes]) -> None:
-    """Check ``tag`` out in the agent's submodule and record it in upstream.json (and checksums.txt).
-
-    ``git(*args, cwd=...)`` runs git and returns stdout. Nothing is staged or committed, and
-    upstream.json is left alone if the checkout or checksums fail.
-    """
     if not tag or tag.startswith("-") or TAG_FORBIDDEN.search(tag):
         raise ValueError(f"{tag!r} is not a usable tag name")
     path = agent_dir / "upstream.json"

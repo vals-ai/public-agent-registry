@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""Check every agent folder under agents/.
-
-Each agents/<name>/ holds a contract.yaml, an upstream.json describing the pinned upstream
-release, and the upstream repo as a git submodule. This script verifies that those agree:
-
-* the contract's ``name`` is the folder name and sets no Vals-only fields,
-* upstream.json is well formed,
-* the submodule exists, sits at upstream.json's commit, and is an HTTPS GitHub URL,
-* upstream.json's tag resolves to that commit upstream (skipped with --offline),
-* every release asset has a sha256 line in checksums.txt.
-
-Across the whole repository it also checks that every submodule in the index is some agent's
-``agents/<agent>/<submodule>`` from its upstream.json, and that every URL in .gitmodules is
-``https://github.com/<owner>/<repo>`` (``.git`` optional).
-
-Usage: python scripts/check_agents.py [--offline]
-Prints one line per problem and exits 1 if there are any.
-"""
-
 import argparse
 import json
 import os
@@ -50,7 +31,6 @@ def _is_relative_path(value: object) -> bool:
 
 
 def check_contract(agent_dir: Path) -> list[str]:
-    """Problems in contract.yaml: unreadable, wrong name, or Vals-only fields."""
     name = agent_dir.name
     path = agent_dir / "contract.yaml"
     if not path.is_file():
@@ -74,7 +54,6 @@ def check_contract(agent_dir: Path) -> list[str]:
 
 
 def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
-    """Read and validate upstream.json. The dict is None when there are problems."""
     name = agent_dir.name
     path = agent_dir / "upstream.json"
     if not path.is_file():
@@ -126,12 +105,6 @@ def check_agent(
     submodule_url: str | None,
     tag_commit: str | None,
 ) -> list[str]:
-    """Return the problems with one agent folder (an empty list means OK).
-
-    ``gitlink`` is the commit the submodule is pinned to in the index (None if there is no
-    submodule), ``submodule_url`` its URL in .gitmodules, and ``tag_commit`` the commit
-    upstream.json's tag resolves to (None skips the tag check).
-    """
     name = agent_dir.name
     problems = check_contract(agent_dir)
     upstream, upstream_problems = load_upstream(agent_dir)
@@ -164,7 +137,6 @@ def check_agent(
 
 
 def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
-    """Run git and return stdout; None for exit 1 when the caller allows it (key not found)."""
     try:
         result = subprocess.run(
             ["git", *args],
@@ -184,12 +156,6 @@ def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
 
 
 def read_gitlinks(root: Path) -> dict[str, str | None]:
-    """Every submodule (mode 160000) entry in the index, in index order, as {path: commit}.
-
-    The commit is None for a conflicted entry (a stage above 0): the path is a submodule, but it
-    is pinned to no single commit. The index equals HEAD in a fresh checkout and also reflects a
-    staged (not yet committed) bump, which is what the bump workflow checks before it commits.
-    """
     out = _git("ls-files", "--stage", "-z", cwd=root)
     gitlinks: dict[str, str | None] = {}
     for entry in out.split("\0"):
@@ -201,7 +167,6 @@ def read_gitlinks(root: Path) -> dict[str, str | None]:
 
 
 def read_gitmodules(root: Path) -> dict[str, dict[str, str]]:
-    """Every ``submodule.<name>.<field>`` in .gitmodules, as {name: {field: value}}."""
     out = _git("config", "-f", ".gitmodules", "-z", "--get-regexp", r"^submodule\.", cwd=root, allow_exit_1=True)
     modules: dict[str, dict[str, str]] = {}
     for entry in (out or "").split("\0"):
@@ -218,15 +183,6 @@ def check_repo(
     agent_submodules: set[str],
     broken_agents: set[str] = frozenset(),
 ) -> list[str]:
-    """Problems with submodules outside the agents' own checks.
-
-    ``agent_submodules`` holds ``agents/<agent>/<submodule>`` for every agent whose upstream.json
-    is valid, and ``broken_agents`` the ``agents/<agent>`` folders whose upstream.json is not (they
-    are already reported, so the submodules inside them are not reported again). Any other gitlink
-    is a stray submodule. No two .gitmodules entries may share a path. The URL of every entry must be
-    an HTTPS GitHub repository, except an agent's own entry (named after its path, which is the one
-    the agent check reads), whose URL is compared with its upstream.json instead.
-    """
     problems = [
         f"{path}: submodule does not belong to an agent "
         "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)"
@@ -250,12 +206,6 @@ def check_repo(
 
 
 def parse_tag_commit(ls_remote_output: str, tag: str) -> str | None:
-    """Pick the commit for ``tag`` out of ``git ls-remote`` output.
-
-    The peeled ``refs/tags/<tag>^{}`` line is the commit an annotated tag points at, so it
-    wins over the plain ``refs/tags/<tag>`` line (the tag object, or the commit itself for a
-    lightweight tag).
-    """
     refs = {}
     for line in ls_remote_output.splitlines():
         sha, _, ref = line.partition("\t")
@@ -264,7 +214,6 @@ def parse_tag_commit(ls_remote_output: str, tag: str) -> str | None:
 
 
 def fetch_tag_commit(repo: str, tag: str) -> str | None:
-    """Resolve ``tag`` in ``repo`` (owner/name) on GitHub to a commit, or None if it does not exist."""
     out = _git("ls-remote", f"{GITHUB}/{repo}.git", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}", cwd=ROOT)
     return parse_tag_commit(out, tag)
 

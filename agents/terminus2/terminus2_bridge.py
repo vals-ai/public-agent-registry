@@ -1,18 +1,3 @@
-"""The bridge between Valkyrie's sandbox and Harbor's Terminus 2. This is the module that imports Harbor.
-
-Harbor runs Terminus 2 outside the task container and drives a tmux session inside it through an
-environment object. Valkyrie runs the agent inside the task container, and none of Harbor's
-environment types runs commands on the current machine, so ``LocalEnvironment`` below is that
-bridge: its ``exec`` runs bash here, and its uploads and downloads are local copies. ``run`` then
-calls Terminus 2 in the order Harbor's ``trial.py`` does (construct, ``setup``, ``run``), with one
-step added: after ``setup`` it types ``cd <task folder>`` into the tmux session, because the login
-shell tmux starts need not begin there. Harbor itself is not modified. This uses Harbor internals
-that are not documented as public API, pinned at the tag in upstream.json.
-
-run_terminus2.py imports this module inside its error handling, so a Harbor that cannot be imported
-is reported like any other failure.
-"""
-
 import asyncio
 import os
 import shlex
@@ -36,7 +21,6 @@ KILL_GRACE_SEC = 5
 
 
 def provider_env_names() -> list[str]:
-    """Every environment variable name in Harbor's provider table: keys, base URLs and the rest."""
     names: set[str] = set()
     for access in PROVIDERS.values():
         names.update(access.api_key_candidate_names, access.base_url_candidate_names, access.extra_env_names)
@@ -45,8 +29,6 @@ def provider_env_names() -> list[str]:
 
 @dataclass(frozen=True)
 class _OutputPaths(TrialPaths):
-    """TrialPaths whose ``agent_dir`` is the output directory itself, not ``<trial_dir>/agent``."""
-
     @property
     def agent_dir(self) -> Path:
         return self.trial_dir
@@ -68,7 +50,6 @@ def _copy_file(source: Path | str, target: Path | str) -> None:
 
 
 def _copy_dir(source: Path | str, target: Path | str) -> None:
-    """Copy the contents of ``source`` into ``target``, overwriting files, like ``docker cp src/. dst``."""
     source, target = Path(source), Path(target)
     if _same_path(source, target):
         return
@@ -87,8 +68,6 @@ def _text(data: bytes | None) -> str | None:
 
 
 class LocalEnvironment(BaseEnvironment):
-    """A Harbor environment that is the machine this runs on: the task container."""
-
     def __init__(self, cwd: Path, out_dir: Path, key_names: Iterable[str]):
         self._cwd = Path(cwd)
         self._key_names = frozenset(key_names)
@@ -137,17 +116,6 @@ class LocalEnvironment(BaseEnvironment):
         timeout_sec: int | None = None,
         user: str | int | None = None,
     ) -> ExecResult:
-        """Run ``command`` with ``bash -c`` in ``cwd`` (default: the task folder), without stdin.
-
-        ``user`` is ignored: Valkyrie runs the agent as root. The command gets this process's
-        environment minus provider keys (``scrubbed_env``), plus ``env``. The tmux server and its
-        shell are started through here, so they never see those keys.
-
-        Timeouts behave as in Harbor's DockerEnvironment.exec: a falsy ``timeout_sec`` waits for
-        as long as the command runs; otherwise, when it passes, the command gets SIGTERM, then
-        SIGKILL after 5 seconds, and RuntimeError("Command timed out after N seconds") is raised.
-        The signals go to the command's whole process group, so nothing it started keeps running.
-        """
         process = await asyncio.create_subprocess_exec(
             "bash",
             "-c",
@@ -177,12 +145,10 @@ class LocalEnvironment(BaseEnvironment):
 
 
 def metrics_of(context: AgentContext) -> dict:
-    """Token and cost totals that Terminus 2 recorded in ``context``."""
     return {key: getattr(context, key) for key in METRIC_KEYS}
 
 
 async def run(problem: Path, model: str, options: dict, out_dir: Path) -> int:
-    """Run Terminus 2 on the task in ``problem`` from the current folder; return the exit code."""
     cwd = Path.cwd()
     context = AgentContext()
     try:

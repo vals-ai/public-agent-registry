@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Run upstream mini-swe-agent on one problem statement and write summary.json.
-
-Usage: run.py PROBLEM --model M [--config C] [--cost-limit X] [--step-limit N]
-              [--cost-tracking V] [--output-dir D]
-
-PROBLEM is the path of a file holding the task. The agent runs in the current directory with the
-``local`` environment, so it edits the benchmark's working directory directly. Outputs land in
-the output directory: ``trajectory.json`` (written by mini-swe-agent) and ``summary.json``
-(always written, even when the agent fails).
-
-Exit code: 0 when the agent stopped on its own (including at a cost or step limit), otherwise
-nonzero, with one ``AgentError: ...`` line in ``$VALKYRIE_ERROR_PATH``. That line only holds the
-exit code and mini-swe-agent's exit status, never the task or model text.
-
-``minisweagent`` is imported inside ``run_mini``, after the environment is set, because it reads
-its settings from the environment at import time and prints a banner unless told not to.
-"""
-
 import argparse
 import json
 import os
@@ -36,12 +18,6 @@ STATUS = re.compile(r"\w{1,80}", re.ASCII)
 def build_argv(
     task: str, *, model: str, config: str, output: Path, cost_limit: str, step_limit: str
 ) -> list[str]:
-    """Command line for ``mini``: unattended, local environment, in the current directory.
-
-    ``-c environment.cwd=`` comes after the config so a benchmark config's fixed ``cwd`` (for
-    example ``/testbed``) does not apply. ``-t`` takes the task as its value even when the text
-    starts with a dash.
-    """
     argv = [
         "-t", task,
         "-m", model,
@@ -52,7 +28,7 @@ def build_argv(
         "-y",
         "--exit-immediately",
         "-o", str(output),
-    ]  # fmt: skip
+    ]
     if cost_limit:
         argv += ["-l", cost_limit]
     if step_limit:
@@ -61,7 +37,6 @@ def build_argv(
 
 
 def read_exit_status(trajectory: Path) -> str | None:
-    """``info.exit_status`` of a saved trajectory, or None if it is missing or malformed."""
     try:
         status = json.loads(trajectory.read_text(encoding="utf-8"))["info"]["exit_status"]
     except (OSError, ValueError, KeyError, TypeError):
@@ -70,7 +45,6 @@ def read_exit_status(trajectory: Path) -> str | None:
 
 
 def summarize(trajectory: Path, upstream: dict, agent_exit_code: int) -> dict:
-    """The summary.json content for one run."""
     stop_reason = read_exit_status(trajectory)
     return {
         "agent": AGENT,
@@ -82,7 +56,6 @@ def summarize(trajectory: Path, upstream: dict, agent_exit_code: int) -> dict:
 
 
 def write_error(message: str) -> None:
-    """Write ``message`` as one line (at most 512 characters) to $VALKYRIE_ERROR_PATH, if set."""
     path = os.environ.get("VALKYRIE_ERROR_PATH")
     if not path:
         return
@@ -118,7 +91,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def run_mini(argv: list[str]) -> int:
-    """Run ``mini`` with ``argv`` in this process and return its exit code."""
     sys.argv = ["mini", *argv]
     try:
         from minisweagent.run.mini import app
@@ -135,7 +107,6 @@ def run_mini(argv: list[str]) -> int:
 
 
 def error_status(stop_reason: str) -> str:
-    """``stop_reason`` as shown in the error line: only word characters, else ``unknown``."""
     return stop_reason if stop_reason == NO_TRAJECTORY or STATUS.fullmatch(stop_reason) else "unknown"
 
 
