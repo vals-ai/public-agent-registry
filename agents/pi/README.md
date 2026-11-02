@@ -36,7 +36,7 @@ valkyrie run start --benchmark swebench --agent pi \
 The run writes to `/logs/pi/`:
 
 - `summary.json`: the agent, the upstream release that ran, the outcome and the stop reason
-- `session.jsonl`: the whole session, one entry per line
+- `sessions/<timestamp>_<id>.jsonl`: the whole session, one entry per line (saved as the `pi/session.jsonl` artifact)
 - `final_message.txt`: pi's final reply
 - `stderr.log`: what pi printed on stderr
 

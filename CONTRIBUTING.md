@@ -227,7 +227,9 @@ one with write access and one that never runs upstream code, opens (or updates) 
 from the branch `bump-<agent-name>`, with a smoke-test checklist. When the only newer release is
 a new major version, it opens an issue instead, one per agent, because that move is a human
 decision; later runs edit that issue to name the newest major version. A bump pull request
-changes the pin only: the contract's `name` stays the same.
+changes the pin only: the contract's `name` stays the same. The workflow needs the repository
+setting "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →
+General).
 
 While a bump pull request is open, the workflow rebuilds its branch from `main` only as long
 as the branch holds nothing but the bot's own commits. Once you push a commit to it (a wrapper
