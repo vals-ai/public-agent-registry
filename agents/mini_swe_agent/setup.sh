@@ -33,6 +33,9 @@ UV_PYTHON_INSTALL_DIR="$python_dir" "$uv" venv --clear --python 3.12 "$venv"
 "$uv" pip install --python "$venv/bin/python" "certifi>=2026.10.19"
 
 mkdir -p /logs /usr/local/bin
-# The entry script has no stdin, so nothing in the agent can wait for input.
-printf '#!/bin/bash\nexec %q %q "$@" < /dev/null\n' "$venv/bin/python" "$here/run.py" > /usr/local/bin/mini-swe-agent-run
+# The entry script has no stdin, so nothing in the agent can wait for input. -E keeps the task's
+# PYTHONPATH, PYTHONHOME and other PYTHON* variables away from the agent's interpreter (they still
+# reach the commands the agent runs), so a task setting PYTHONPATH cannot shadow mini-swe-agent's or
+# litellm's modules.
+printf '#!/bin/bash\nexec %q -E %q "$@" < /dev/null\n' "$venv/bin/python" "$here/run.py" > /usr/local/bin/mini-swe-agent-run
 chmod +x /usr/local/bin/mini-swe-agent-run

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -223,3 +224,46 @@ def test_main_error_line_never_echoes_a_free_text_status(mini_env, monkeypatch):
     install_fake_mini(monkeypatch, fake_app("some free text from somewhere", 1))
     assert run.main(mini_env.base) == 1
     assert mini_env.err.read_text() == "AgentError: mini-swe-agent exited with code 1 (unknown)\n"
+
+
+TASK_UTF8 = "Fix the café menu: naïve → résumé ✓"
+
+
+def test_main_passes_a_non_ascii_task_through(mini_env, monkeypatch):
+    mini_env.problem.write_text(TASK_UTF8, encoding="utf-8")
+    calls = []
+    install_fake_mini(monkeypatch, fake_app("Submitted", 0, calls))
+    assert run.main(mini_env.base) == 0
+    assert option_value(calls[0]["argv"], "-t") == TASK_UTF8
+
+
+def test_main_reads_the_task_as_utf8_whatever_the_locale(tmp_path):
+    """The entry script runs Python with -E, so PYTHONUTF8 cannot help: a Latin-1 locale must not matter."""
+    env = {**os.environ, "LC_ALL": "en_US.ISO8859-1", "LANG": "en_US.ISO8859-1"}
+    env.pop("PYTHONUTF8", None)
+    probe = [sys.executable, "-E", "-X", "utf8=0", "-c", "import locale; print(locale.getencoding())"]
+    encoding = subprocess.run(probe, env=env, capture_output=True, text=True, check=True).stdout.strip()
+    if encoding.lower().replace("-", "") == "utf8":
+        pytest.skip("no Latin-1 locale on this machine, so the default encoding is UTF-8 anyway")
+
+    problem = tmp_path / "p.md"
+    problem.write_text(TASK_UTF8, encoding="utf-8")
+    seen = tmp_path / "seen.txt"
+    code = f"""
+import importlib.util, sys, types
+spec = importlib.util.spec_from_file_location("run", {str(RUN)!r})
+run = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run)
+def app():
+    open({str(seen)!r}, "w", encoding="utf-8").write(sys.argv[sys.argv.index("-t") + 1])
+    raise SystemExit(0)
+mini = types.ModuleType("minisweagent.run.mini")
+mini.app = app
+for name in ("minisweagent", "minisweagent.run"):
+    sys.modules[name] = types.ModuleType(name)
+sys.modules["minisweagent.run.mini"] = mini
+sys.exit(run.main([{str(problem)!r}, "--model", "m", "--output-dir", {str(tmp_path / "out")!r}]))
+"""
+    result = subprocess.run([sys.executable, "-E", "-X", "utf8=0", "-c", code], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert seen.read_text(encoding="utf-8") == TASK_UTF8

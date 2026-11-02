@@ -59,6 +59,9 @@ other ending (a bad API key, an unpriced model, a crash) exits 1 with a one-line
   `-k cost_tracking=ignore_errors` for such models (and `cost_limit` then cannot stop the run).
 - API keys passed with `-s` are environment variables inside the sandbox, so the agent's own commands
   can read them.
+- The agent's Python runs with `-E`, so the task's `PYTHONPATH`, `PYTHONHOME` and other `PYTHON*`
+  variables cannot change which modules mini-swe-agent and litellm load. The commands the agent runs
+  still have them, as the task set them.
 - `setup.sh` also installs litellm's `mcp` extra. litellm 1.106 imports `mcp` on every request that
   carries tools (mini-swe-agent's always do) without declaring it as a dependency.
 

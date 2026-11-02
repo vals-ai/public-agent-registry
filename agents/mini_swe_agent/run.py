@@ -62,7 +62,7 @@ def build_argv(
 def read_exit_status(trajectory: Path) -> str | None:
     """``info.exit_status`` of a saved trajectory, or None if it is missing or malformed."""
     try:
-        status = json.loads(trajectory.read_text())["info"]["exit_status"]
+        status = json.loads(trajectory.read_text(encoding="utf-8"))["info"]["exit_status"]
     except (OSError, ValueError, KeyError, TypeError):
         return None
     return status if isinstance(status, str) else None
@@ -91,7 +91,7 @@ def write_error(message: str) -> None:
 
 def load_upstream(path: Path) -> dict:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
 
     error = None
     try:
-        task = Path(args.problem).read_text()
+        task = Path(args.problem).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         code = 1
         error = "AgentError: cannot read the problem statement"
