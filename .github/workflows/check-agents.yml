@@ -1,9 +1,5 @@
 name: Check agents
 
-# Runs scripts/check_agents.py on every pull request and on main. No upstream repo is cloned
-# (opencode's history alone is about 620 MB); check_agents.py reads their pinned commits from the
-# index.
-
 on:
   pull_request:
   push:
@@ -16,7 +12,6 @@ concurrency:
   group: check-agents-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# bash -eo pipefail: a failing command in a pipe fails the step.
 defaults:
   run:
     shell: bash
@@ -33,7 +28,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "0.13.5" # the uv that the agents' setup.sh installs
+          version: "0.13.5"
 
       - name: Install dependencies
         run: uv sync --locked

@@ -289,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     for contract in sorted((ROOT / "agents").glob("*/contract.yaml")):
         agent_dir = contract.parent
         name = agent_dir.name
-        upstream, _ = load_upstream(agent_dir)  # its problems are reported by check_agent
+        upstream, _ = load_upstream(agent_dir)
 
         gitlink = submodule_url = tag_commit = None
         lookup_problems = []
@@ -298,7 +298,7 @@ def main(argv: list[str] | None = None) -> int:
             path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
             agent_submodules.add(path)
             gitlink = gitlinks.get(path)
-            submodule_url = modules.get(path, {}).get("url")  # what `git config submodule.<path>.url` reads
+            submodule_url = modules.get(path, {}).get("url")
             if list_error is not None:
                 lookup_problems.append(f"{name}: could not read submodule {path} from git: {list_error}")
             if not args.offline:

@@ -12,7 +12,6 @@ from pathlib import Path
 AGENT = "terminus2"
 UPSTREAM = Path(__file__).with_name("upstream.json")
 MAX_ERROR_CHARS = 512
-# The AgentContext fields copied into summary.json's "metrics".
 METRIC_KEYS = ("n_input_tokens", "n_output_tokens", "n_cache_tokens", "cost_usd", "metadata")
 
 

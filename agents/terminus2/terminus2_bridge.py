@@ -32,7 +32,6 @@ from harbor.models.task.config import EnvironmentConfig
 from harbor.models.trial.paths import TrialPaths
 from terminus2_support import METRIC_KEYS, scrubbed_env, write_error, write_summary
 
-# DockerEnvironment._terminate_process waits this long after SIGTERM before SIGKILL.
 KILL_GRACE_SEC = 5
 
 
@@ -188,9 +187,9 @@ async def run(problem: Path, model: str, options: dict, out_dir: Path) -> int:
     context = AgentContext()
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "trajectory.json").unlink(missing_ok=True)  # never ship an earlier run's file
+        (out_dir / "trajectory.json").unlink(missing_ok=True)
     except OSError:
-        pass  # Terminus 2 logs its own failure to write here; write_summary reports ours
+        pass
     try:
         instruction = problem.read_text(encoding="utf-8")
         environment = LocalEnvironment(cwd=cwd, out_dir=out_dir, key_names=provider_env_names())

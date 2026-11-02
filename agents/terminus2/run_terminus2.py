@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as error:
         return fail(out_dir, f"AgentError: terminus2 {error}", "invalid_options")
     try:
-        import terminus2_bridge  # imports Harbor, so a broken install is reported like any failure
+        import terminus2_bridge
     except Exception as error:
         traceback.print_exc()
         name = type(error).__name__

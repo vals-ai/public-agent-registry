@@ -129,8 +129,6 @@ def run_mini(argv: list[str]) -> int:
             return 0
         return stop.code if isinstance(stop.code, int) else 1
     except Exception:
-        # mini re-raises the model or environment error that ended the run. The trajectory
-        # already records its type as the exit status.
         traceback.print_exc()
         return 1
     return 0
@@ -146,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     trajectory = output_dir / "trajectory.json"
-    trajectory.unlink(missing_ok=True)  # never summarize a leftover from an earlier run
+    trajectory.unlink(missing_ok=True)
 
     error = None
     try:
