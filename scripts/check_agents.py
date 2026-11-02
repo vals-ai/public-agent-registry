@@ -9,14 +9,24 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 import yaml
-from bump_agent import GITHUB, HEX40, TAG_FORBIDDEN, checksum_entry
 
 ROOT = Path(__file__).resolve().parent.parent
 
+GITHUB = "https://github.com"
+HEX40 = re.compile(r"[0-9a-f]{40}")
+TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
+CHECKSUM_LINE = re.compile(r"([0-9a-fA-F]{64})\s+\*?(.+)")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 GITHUB_URL = re.compile(re.escape(GITHUB) + "/" + REPO.pattern)
 FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
 GIT_TIMEOUT = 60
+
+
+def checksum_entry(line: str) -> tuple[str, str] | None:
+    match = CHECKSUM_LINE.fullmatch(line.strip())
+    if not match:
+        return None
+    return match.group(1).lower(), match.group(2).strip().removeprefix("./")
 
 
 def _is_str(value: object) -> bool:

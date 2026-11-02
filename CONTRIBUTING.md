@@ -38,17 +38,20 @@ Add the upstream repository as a shallow submodule inside the agent folder, over
 ```bash
 git submodule add --depth 1 https://github.com/<owner>/<repo>.git agents/<agent-name>/<submodule>
 git config -f .gitmodules submodule.agents/<agent-name>/<submodule>.shallow true
-printf '{\n  "repo": "<owner>/<repo>",\n  "tag": "",\n  "commit": "",\n  "submodule": "<submodule>"\n}\n' > agents/<agent-name>/upstream.json
-uv run python scripts/bump_agent.py agents/<agent-name> --pin <tag>
+git -C agents/<agent-name>/<submodule> fetch --depth 1 origin tag <tag>
+git -C agents/<agent-name>/<submodule> checkout --detach <tag>
+git -C agents/<agent-name>/<submodule> rev-parse HEAD     # the commit for upstream.json
+```
+
+Then write `upstream.json` (see below) with that tag and commit, and run:
+
+```bash
 git add .gitmodules agents/<agent-name>
 uv run python scripts/check_agents.py
 ```
 
 `<submodule>` is the folder name you chose for the checkout, usually the repository's name.
 Do not set `branch =` in `.gitmodules`: the pin is what makes an install reproducible.
-`--pin` checks the tag out in the submodule and fills in `tag` and `commit` in
-`upstream.json` (and `checksums.txt`, see `assets` below). It stages nothing, so you
-`git add` the result.
 
 If the agent is a module inside a larger project (Terminus 2 is part of Harbor), the
 upstream repository is the whole project and the wrapper imports the part it needs.
@@ -62,11 +65,11 @@ be read inside the sandbox.
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `repo` | yes | The upstream GitHub repository, `owner/name`. |
-| `tag` | yes | The pinned release tag, a plain version such as `v1.2.3` so that `bump_agent.py` can compare it. |
+| `tag` | yes | The pinned release tag, a plain version such as `v1.2.3`. |
 | `commit` | yes | The 40-character commit the tag points at. It must equal the submodule's pinned commit. |
 | `submodule` | yes | Path of the submodule inside the agent folder, relative. |
-| `track` | no | Only releases whose tag starts with this are considered, for example `"v1."` keeps opencode on 1.x while 2.x exists. Without it, only releases with the current tag's major version count. |
-| `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`, which `--pin` writes from the release's `SHA256SUMS` (or `sha256sum.txt`, or by downloading and hashing the asset). Other lines, such as a static `jq`, are kept. |
+| `track` | no | The release line the agent follows, as a tag prefix: `"v1."` keeps opencode on 1.x while 2.x exists. Without it, the agent follows its current major version. |
+| `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`: copy it from the release's `SHA256SUMS` (or `sha256sum.txt`) when it has one, otherwise download the asset and run `sha256sum`. Other lines, such as a static `jq`, stay as they are. |
 
 `scripts/check_agents.py` fails if `upstream.json` is malformed, if its commit differs
 from the submodule's, if the tag does not resolve to that commit upstream, if the
@@ -79,8 +82,7 @@ on any `.gitmodules` URL that is not `https://github.com/<owner>/<repo>`.
 Pin the newest upstream release that is at least seven days old. This is the same
 seven-day aging the repository applies to Python packages (`exclude-newer`), and it keeps
 a bad release from reaching the registry before upstream has noticed it. Drafts and
-prereleases never count. `bump_agent.py` applies the rule for you when it picks a release,
-but `--pin` takes any tag, so check the release date yourself when you pin by hand.
+prereleases never count. Check the release date on the upstream repository's releases page.
 
 ### The wrapper adapts input and output only
 
@@ -197,44 +199,24 @@ uv sync
 uv run python scripts/check_agents.py            # --offline skips the upstream tag lookup
 ```
 
-`check-agents.yml` runs this on every pull request, except the bump pull requests
-described below: a pull request opened with the workflow's `GITHUB_TOKEN` does not trigger
-other workflows, so the bump workflow runs `check_agents.py` itself. If `check-agents.yml` is a
-required check on `main`, a maintainer has to run it on a bump pull request, for example by
-closing and reopening the pull request. Pushing a commit to it runs the check too, but then
-the bot stops updating the branch (see below).
+`check-agents.yml` runs this on every pull request.
 
 ## Updating an Agent
 
-`scripts/bump_agent.py` moves the pin of one agent:
+To move an agent to a newer release, pick the newest release on its line that is at least
+seven days old, then check it out in the submodule:
 
 ```bash
-uv run python scripts/bump_agent.py agents/<agent-name> --dry-run   # report only
-uv run python scripts/bump_agent.py agents/<agent-name>             # newest eligible release
-uv run python scripts/bump_agent.py agents/<agent-name> --pin v1.2.3
+git -C agents/<agent-name>/<submodule> fetch --depth 1 origin tag <tag>
+git -C agents/<agent-name>/<submodule> checkout --detach <tag>
+git -C agents/<agent-name>/<submodule> rev-parse HEAD     # the new commit
 ```
 
-It prints one JSON line, `{"agent", "from", "to", "newer_major"}`. `to` is the tag it picked,
-or null when the pin is current. `newer_major` is the newest release at least seven days old
-on a higher major version, which the script never moves to by itself. Set `GITHUB_TOKEN` to
-get higher GitHub API rate limits. The script checks the tag out in the submodule and rewrites
-`upstream.json` and `checksums.txt`, but stages nothing: `git add agents/<agent-name>`, run
-`scripts/check_agents.py`, and commit.
-
-Every Monday the `bump-agents.yml` workflow runs the script for each agent. When there is a
-newer release, a read-only job runs `check_agents.py` on the bump, and a second job, the only
-one with write access and one that never runs upstream code, opens (or updates) a pull request
-from the branch `bump-<agent-name>`, with a smoke-test checklist. When the only newer release is
-a new major version, it opens an issue instead, one per agent, because that move is a human
-decision; later runs edit that issue to name the newest major version. A bump pull request
-changes the pin only: the contract's `name` stays the same. The workflow needs the repository
-setting "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →
-General).
-
-While a bump pull request is open, the workflow rebuilds its branch from `main` only as long
-as the branch holds nothing but the bot's own commits. Once you push a commit to it (a wrapper
-fix, say), later runs leave the branch alone and only refresh the description, which then
-names any newer release. Merge or close the pull request to let the bot move on.
+Update `tag` and `commit` in `upstream.json`, refresh the asset lines in `checksums.txt` if
+the agent has `assets`, then `git add agents/<agent-name>`, run `scripts/check_agents.py`,
+and commit. Open the bump as a pull request with the update-agent template and run the smoke
+test below before merging. A bump changes the pin only: the contract's `name` stays the same.
+Moving to a new major version is a human decision.
 
 ## Before opening a pr
 

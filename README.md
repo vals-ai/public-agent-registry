@@ -18,7 +18,7 @@ upstream code is a git submodule inside it, pinned to a release tag.
 | [`terminus2`](agents/terminus2/README.md) | [harbor-framework/harbor](https://github.com/harbor-framework/harbor) | Terminus 2, the terminal agent built into Harbor, which works through a tmux session. Built for Terminal-Bench. |
 
 Each agent is pinned to an upstream release tag. The `tag` and `commit` are in the agent's
-`agents/<agent-name>/upstream.json`, which the weekly bump pull requests update.
+`agents/<agent-name>/upstream.json`.
 Each agent's README lists its secrets, model names, kwargs and output files.
 
 ## Repository Layout
@@ -26,8 +26,7 @@ Each agent's README lists its secrets, model names, kwargs and output files.
 - `agents/`: the agents above. Each is a folder holding its Valkyrie contract and
   wrapper scripts, with the upstream repository as a submodule inside it.
 - `examples/`: example contracts and reference implementations only.
-- `scripts/`: `check_agents.py` verifies every agent folder, and `bump_agent.py`
-  moves an agent's pin to a newer upstream release.
+- `scripts/`: `check_agents.py` verifies every agent folder.
 - `CONTRIBUTING.md`: contribution workflow and review expectations.
 
 ## Agent Directory Shape
@@ -44,11 +43,8 @@ agents/<agent-name>/
 ```
 
 See the [contract documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md)
-for the fields `contract.yaml` supports. A weekly workflow opens one pull request
-per agent when upstream has a newer release that is at least seven days old. Every
-pull request is checked against `upstream.json` and the upstream tags: the weekly
-workflow checks its own pull requests itself, because a pull request it opens does
-not trigger the check workflow (see [CONTRIBUTING.md](CONTRIBUTING.md#checks)).
+for the fields `contract.yaml` supports. Every pull request is checked against
+`upstream.json` and the upstream tags (see [CONTRIBUTING.md](CONTRIBUTING.md#checks)).
 
 ## Using an Agent
 
