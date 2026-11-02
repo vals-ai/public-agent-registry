@@ -4,8 +4,8 @@ Terminus 2, the agent built into [Harbor](https://github.com/harbor-framework/ha
 run for Valkyrie exactly as upstream ships it. Terminus 2 has no repository of its own: it is
 `harbor.agents.terminus_2.Terminus2` inside Harbor, so the upstream repository is all of Harbor, the
 `harbor/` git submodule, pinned to tag **v0.25.0** (the commit is in `upstream.json`). Only
-`contract.yaml`, `setup.sh`, `run_terminus2.py`, `terminus2_support.py` and this README are
-Vals-authored. Harbor itself is not modified.
+`contract.yaml`, `setup.sh`, `run_terminus2.py`, `terminus2_bridge.py`, `terminus2_support.py` and
+this README are Vals-authored. Harbor itself is not modified.
 
 ## Install
 
@@ -58,7 +58,7 @@ Terminus 2 works in a tmux session: each turn the model reads the screen and sen
 Harbor normally runs Terminus 2 *outside* the task container and drives the tmux session inside it
 through an environment object (`exec`, `upload_file`, `download_file`). Valkyrie runs the agent
 *inside* the task container, and none of Harbor's environment types runs commands on the current
-machine. So `run_terminus2.py` defines a small `LocalEnvironment` (a Harbor `BaseEnvironment`) whose
+machine. So `terminus2_bridge.py` defines a small `LocalEnvironment` (a Harbor `BaseEnvironment`) whose
 `exec` runs `bash -c` on this machine, with timeouts that behave like Harbor's Docker environment, and
 whose uploads and downloads are local copies. It then calls Terminus 2 in the order Harbor's own
 `trial.py` does: construct `Terminus2(..., record_terminal_session=False)`, `setup` (which starts
@@ -93,9 +93,10 @@ collected as `terminus2/`:
 The run exits 0 when Terminus 2 finishes on its own: when it has confirmed the task complete, reached
 `max_turns`, or its tmux session ended. Terminus 2 does not report which of these it was; `metadata`'s
 `n_episodes` shows how many turns it took. Any exception (a bad API key, an unknown model, tmux
-failing to start) exits 1 with a one-line `AgentError: terminus2 <ExceptionClass>` reason for
-Valkyrie, so the task is skipped rather than graded. Only the class name is copied, never the message,
-since it can quote the task or the model. The full traceback goes to stderr.
+failing to start, Harbor failing to import) exits 1 with a one-line
+`AgentError: terminus2 <ExceptionClass>` reason for Valkyrie, so the task is skipped rather than
+graded. Only the class name is copied, never the message, since it can quote the task or the model.
+The full traceback goes to stderr.
 
 ## Quirks
 
@@ -113,6 +114,9 @@ since it can quote the task or the model. The full traceback goes to stderr.
   runs while it is still there. A server the agent started for the task keeps running for grading.
 - Terminus 2 talks to the model through litellm, so the usual provider variables apply. The
   `terminus2-run` process has no stdin, and its commands run as the sandbox's user (root).
+- The agent's Python runs with `-E`, so the task's `PYTHONPATH`, `PYTHONHOME` and other `PYTHON*`
+  variables cannot change which modules the harness loads. The shell the agent works in still has
+  them, as the task set them.
 - Terminal recording (asciinema) is off, so nothing beyond tmux is installed.
 - The install was checked on Debian (`debian:bookworm-slim`, arm64), twice in one container, and on
   Fedora 42 (`dnf`); Alpine stops with the message above. Without a real API key, the run was checked

@@ -73,6 +73,8 @@ UV_PROJECT_ENVIRONMENT="$venv" UV_PYTHON_INSTALL_DIR="$python_dir" \
 "$uv" pip install --python "$venv/bin/python" "certifi>=2026.10.19"
 
 mkdir -p /usr/local/bin
-# The entry script has no stdin, so nothing in the agent can wait for input.
-printf '#!/bin/bash\nexec %q %q "$@" < /dev/null\n' "$venv/bin/python" "$here/run_terminus2.py" > /usr/local/bin/terminus2-run
+# The entry script has no stdin, so nothing in the agent can wait for input. -E keeps the task's
+# PYTHONPATH, PYTHONHOME and other PYTHON* variables away from the agent's interpreter (they still
+# reach the shell the agent works in), so a task setting PYTHONPATH cannot shadow Harbor's modules.
+printf '#!/bin/bash\nexec %q -E %q "$@" < /dev/null\n' "$venv/bin/python" "$here/run_terminus2.py" > /usr/local/bin/terminus2-run
 chmod +x /usr/local/bin/terminus2-run

@@ -11,6 +11,13 @@ from pathlib import Path
 
 AGENT = "terminus2"
 MAX_ERROR_CHARS = 512
+# The AgentContext fields copied into summary.json's "metrics".
+METRIC_KEYS = ("n_input_tokens", "n_output_tokens", "n_cache_tokens", "cost_usd", "metadata")
+
+
+def no_metrics() -> dict:
+    """The ``metrics`` of a run that ended before Terminus 2 recorded any: every key, all null."""
+    return dict.fromkeys(METRIC_KEYS)
 
 
 def scrubbed_env(environ: Mapping[str, str], key_names: Iterable[str]) -> dict[str, str]:

@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -151,3 +153,49 @@ def test_the_shipped_upstream_json_loads():
     upstream = support.load_upstream(AGENT_DIR / "upstream.json")
     assert upstream["repo"] == "harbor-framework/harbor"
     assert upstream["submodule"] == "harbor"
+
+
+# --- run_terminus2.main when Harbor cannot be imported ---------------------------------------
+
+
+def test_main_reports_a_harbor_that_cannot_be_imported(tmp_path, monkeypatch):
+    """A task's PYTHONPATH (or a damaged venv) can leave ``harbor`` as some unrelated module. The run
+    must still write summary.json and one AgentError line, and exit 1."""
+    # Hide any Harbor already imported by other tests (its submodules would satisfy the bridge's
+    # imports from the cache) behind a plain module named harbor, which is not a package.
+    for name in [name for name in sys.modules if name == "harbor" or name.startswith("harbor.")]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setitem(sys.modules, "harbor", types.ModuleType("harbor"))
+    monkeypatch.delitem(sys.modules, "terminus2_bridge", raising=False)
+    monkeypatch.setitem(sys.modules, "terminus2_support", support)
+    monkeypatch.syspath_prepend(str(AGENT_DIR))
+    monkeypatch.setenv("VALKYRIE_ERROR_PATH", str(tmp_path / "err"))
+    # Guard: if the bridge could still be imported, main would start a real tmux session.
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("terminus2_bridge")
+    spec = importlib.util.spec_from_file_location("run_terminus2_without_harbor", AGENT_DIR / "run_terminus2.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    problem = tmp_path / "p.md"
+    problem.write_text("SECRET TASK TEXT")
+    upstream = AGENT_DIR / "upstream.json"
+    out = tmp_path / "out"
+
+    code = runner.main([str(problem), "--model", "m", "--output-dir", str(out), "--upstream", str(upstream)])
+
+    assert code == 1
+    assert (tmp_path / "err").read_text() == "AgentError: terminus2 ModuleNotFoundError\n"
+    assert read_summary(out) == {
+        "agent": "terminus2",
+        "upstream": support.load_upstream(upstream),
+        "outcome": "error",
+        "stop_reason": "ModuleNotFoundError",
+        "agent_exit_code": 1,
+        "metrics": {
+            "n_input_tokens": None,
+            "n_output_tokens": None,
+            "n_cache_tokens": None,
+            "cost_usd": None,
+            "metadata": None,
+        },
+    }
