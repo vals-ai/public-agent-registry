@@ -140,7 +140,7 @@ def check_agent(
 ) -> list[str]:
     """Return the problems with one agent folder (an empty list means OK).
 
-    ``gitlink`` is the commit the submodule is pinned to in HEAD (None if there is no
+    ``gitlink`` is the commit the submodule is pinned to in the index (None if there is no
     submodule), ``submodule_url`` its URL in .gitmodules, and ``tag_commit`` the commit
     upstream.json's tag resolves to (None skips the tag check).
     """
@@ -193,13 +193,16 @@ def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
 
 
 def read_gitlink(root: Path, path: str) -> str | None:
-    """The commit a submodule is pinned to in HEAD, or None if ``path`` is not a gitlink."""
-    out = _git("ls-tree", "HEAD", path, cwd=root)
+    """The commit a submodule is pinned to in the index, or None if ``path`` is not a gitlink.
+
+    The index equals HEAD in a fresh checkout and also reflects a staged (not yet committed)
+    bump, which is what the bump workflow checks before it commits.
+    """
+    out = _git("ls-files", "-s", "--", path, cwd=root)
     for line in out.splitlines():
         meta, _, entry = line.partition("\t")
-        mode, _, rest = meta.partition(" ")
-        _, _, sha = rest.partition(" ")
-        if entry == path and mode == "160000":
+        mode, sha, stage = meta.split()
+        if entry == path and mode == "160000" and stage == "0":
             return sha
     return None
 

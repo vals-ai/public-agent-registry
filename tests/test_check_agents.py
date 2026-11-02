@@ -251,6 +251,28 @@ def test_fetch_tag_commit_raises_when_the_remote_cannot_be_read(tmp_path, monkey
         check_agents.fetch_tag_commit("o/missing", "v1.0.0")
 
 
+# Reading gitlinks from the index.
+
+
+def test_read_gitlink_sees_a_staged_gitlink_before_any_commit(tmp_path):
+    git(tmp_path, "init", "-q")
+    git(tmp_path, "update-index", "--add", "--cacheinfo", f"160000,{A},agents/x/r")
+    assert check_agents.read_gitlink(tmp_path, "agents/x/r") == A
+
+
+def test_read_gitlink_is_none_without_an_entry(tmp_path):
+    git(tmp_path, "init", "-q")
+    assert check_agents.read_gitlink(tmp_path, "agents/x/r") is None
+
+
+def test_read_gitlink_is_none_for_a_plain_directory(tmp_path):
+    git(tmp_path, "init", "-q")
+    (tmp_path / "agents" / "x" / "r").mkdir(parents=True)
+    (tmp_path / "agents" / "x" / "r" / "f").write_text("1")
+    git(tmp_path, "add", "agents/x/r/f")
+    assert check_agents.read_gitlink(tmp_path, "agents/x/r") is None
+
+
 # main() against a throwaway git repository.
 
 
@@ -302,10 +324,23 @@ def test_main_reports_a_missing_submodule(registry, capsys):
 
 def test_main_reports_when_git_cannot_read_the_submodule(registry, tmp_path, capsys):
     registry()
-    git(tmp_path, "update-ref", "-d", "HEAD")  # no commits: `git ls-tree HEAD` fails
+    (tmp_path / ".git" / "index").write_text("not an index")  # `git ls-files` fails
     assert check_agents.main(["--offline"]) == 1
     out = capsys.readouterr().out
     assert out.startswith("x: submodule r is missing\nx: could not read submodule agents/x/r from git: ")
+
+
+def test_main_reads_the_gitlink_from_the_index_not_head(registry, tmp_path, capsys):
+    registry()  # HEAD pins agents/x/r to A
+    git(tmp_path, "update-index", "--cacheinfo", f"160000,{'b' * 40},agents/x/r")  # staged bump, not committed
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out == "x: submodule r is at bbbbbbbbbbbb, upstream.json says aaaaaaaaaaaa\n"
+
+    (tmp_path / "agents" / "x" / "upstream.json").write_text(
+        json.dumps({"repo": "o/r", "tag": "v1.0.0", "commit": "b" * 40, "submodule": "r"})
+    )
+    assert check_agents.main(["--offline"]) == 0
+    assert capsys.readouterr().out == ""
 
 
 def test_main_reports_a_bad_submodule_url(registry, capsys):
