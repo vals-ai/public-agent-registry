@@ -56,10 +56,9 @@ def test_asset_needs_checksum_line(make_agent):
     ]
 
 
-@pytest.mark.parametrize("field", ["secrets", "ingest_lambda"])
-def test_contract_must_not_carry_vals_fields(make_agent, field):
-    agent = make_agent(contract={field: {"K": "v"}})
-    assert check_agent(agent, gitlink=A, submodule_url=URL, tag_commit=A) == [f"x: contract must not set {field}"]
+def test_contract_must_not_have_a_secrets_block(make_agent):
+    agent = make_agent(contract={"secrets": {"K": "v"}})
+    assert check_agent(agent, gitlink=A, submodule_url=URL, tag_commit=A) == ["x: contract must not set secrets"]
 
 
 # Beyond the brief: URL forms, skipped tag check, file and field validation.

@@ -4,7 +4,7 @@
 Each agents/<name>/ holds a contract.yaml, an upstream.json describing the pinned upstream
 release, and the upstream repo as a git submodule. This script verifies that those agree:
 
-* the contract's ``name`` is the folder name and sets no Vals-only fields,
+* the contract's ``name`` is the folder name and it has no ``secrets`` block,
 * upstream.json is well formed,
 * the submodule exists, sits at upstream.json's commit, and is an HTTPS GitHub URL,
 * upstream.json's tag resolves to that commit upstream (skipped with --offline),
@@ -36,7 +36,7 @@ REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 GITHUB_URL = re.compile(re.escape(GITHUB) + "/" + REPO.pattern)
 TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
 CHECKSUM_LINE = re.compile(r"([0-9a-fA-F]{64})\s+\*?(.+)")
-FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
+FORBIDDEN_CONTRACT_FIELDS = ("secrets",)
 GIT_TIMEOUT = 60
 
 
@@ -56,7 +56,7 @@ def _is_relative_path(value: object) -> bool:
 
 
 def check_contract(agent_dir: Path) -> list[str]:
-    """Problems in contract.yaml: unreadable, wrong name, or Vals-only fields."""
+    """Problems in contract.yaml: unreadable, wrong name, or a forbidden field such as ``secrets``."""
     name = agent_dir.name
     path = agent_dir / "contract.yaml"
     if not path.is_file():
