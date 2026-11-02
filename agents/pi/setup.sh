@@ -48,7 +48,7 @@ download() {
     echo "no sha256 for $name in checksums.txt" >&2
     return 1
   fi
-  curl -fsSL --retry 2 --connect-timeout 20 --max-time 240 --retry-max-time 240 "$url" -o "$work/$name"
+  curl -fsSL --retry 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60 "$url" -o "$work/$name"
   (cd "$work" && printf '%s\n' "$line" | sha256sum -c -)
 }
 

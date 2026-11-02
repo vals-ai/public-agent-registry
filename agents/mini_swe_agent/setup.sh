@@ -12,10 +12,11 @@ if ! command -v curl &> /dev/null; then
 fi
 
 uv_installer="$(mktemp)"
-curl -LsSf https://github.com/astral-sh/uv/releases/download/0.13.5/uv-installer.sh -o "$uv_installer"
+trap 'rm -f "$uv_installer"' EXIT
+curl -fsSL --retry 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60 \
+  https://github.com/astral-sh/uv/releases/download/0.13.5/uv-installer.sh -o "$uv_installer"
 printf '%s  %s\n' '1c6e7f025499664633ac2dce43a210800510e9ef0625c52e034a8afdf8bf177a' "$uv_installer" | sha256sum -c -
 UV_UNMANAGED_INSTALL="$uv_dir" sh "$uv_installer"
-rm "$uv_installer"
 uv="$uv_dir/uv"
 
 UV_PYTHON_INSTALL_DIR="$python_dir" "$uv" venv --clear --python 3.12 "$venv"

@@ -68,11 +68,12 @@ be read inside the sandbox.
 | `tag` | yes | The pinned release tag, a plain version such as `v1.2.3`. |
 | `commit` | yes | The 40-character commit the tag points at. It must equal the submodule's pinned commit. |
 | `submodule` | yes | Path of the submodule inside the agent folder, relative. |
-| `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`: copy it from the release's `SHA256SUMS` (or `sha256sum.txt`) when it has one, otherwise download the asset and run `sha256sum`. Other lines, such as a static `jq`, stay as they are. |
+| `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`, exactly as `sha256sum` prints it (lowercase hex, two spaces, a bare file name): copy it from the release's `SHA256SUMS` (or `sha256sum.txt`) when it has one, otherwise download the asset and run `sha256sum`. Other lines, such as a static `jq`, stay as they are. |
 
 `scripts/check_agents.py` fails if `upstream.json` is malformed, if its commit differs
 from the submodule's, if the tag does not resolve to that commit upstream, if the
-submodule URL is not `https://github.com/<repo>`, or if an asset has no checksum line.
+submodule URL is not `https://github.com/<repo>`, if an asset has no checksum line, or if
+a line in `checksums.txt` is not in that format.
 It also fails on any submodule that is not an agent's `agents/<agent>/<submodule>`, and
 on any `.gitmodules` URL that is not `https://github.com/<owner>/<repo>`.
 

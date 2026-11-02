@@ -60,7 +60,10 @@ def write_error(message: str) -> None:
     if not path:
         return
     line = " ".join(message.split())[:MAX_ERROR_CHARS]
-    Path(path).write_text(line + "\n")
+    try:
+        Path(path).write_text(line + "\n")
+    except OSError as error:
+        print(f"run.py: could not write the error line: {type(error).__name__}", file=sys.stderr)
 
 
 def load_upstream(path: Path) -> dict:
@@ -97,9 +100,10 @@ def run_mini(argv: list[str]) -> int:
 
         app()
     except SystemExit as stop:
-        if stop.code is None:
-            return 0
-        return stop.code if isinstance(stop.code, int) else 1
+        if stop.code is None or isinstance(stop.code, int):
+            return int(stop.code or 0)
+        print(stop.code, file=sys.stderr)
+        return 1
     except Exception:
         traceback.print_exc()
         return 1

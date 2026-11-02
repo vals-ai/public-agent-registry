@@ -18,6 +18,10 @@ for file in "$session_dir"/*.jsonl; do
     session="$file"
   fi
 done
+rm -f "$out/session.jsonl"
+if [ -n "$session" ]; then
+  cp "$session" "$out/session.jsonl" || echo "finish.sh: could not copy the session" >&2
+fi
 
 stop=""
 if [ "$code" -ne 137 ] && [ -n "$session" ]; then

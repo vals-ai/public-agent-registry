@@ -52,7 +52,7 @@ download() {
     echo "no sha256 for $name in checksums.txt" >&2
     return 1
   fi
-  curl -fsSL --retry 3 "$url" -o "$work/$name"
+  curl -fsSL --retry 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60 "$url" -o "$work/$name"
   (cd "$work" && printf '%s\n' "$line" | sha256sum -c -)
 }
 
@@ -73,7 +73,10 @@ if [ ! -f "$package" ]; then
   exit 1
 fi
 expected="$("$jq" -r .version "$package")"
-installed="$(OPENCODE_DISABLE_AUTOUPDATE=1 "$install_dir/opencode" --version)"
+installed="$(OPENCODE_DISABLE_AUTOUPDATE=1 "$install_dir/opencode" --version)" || {
+  echo "$install_dir/opencode --version failed" >&2
+  exit 1
+}
 if [ "$installed" != "$expected" ]; then
   echo "opencode version mismatch: installed $installed, submodule $expected" >&2
   exit 1

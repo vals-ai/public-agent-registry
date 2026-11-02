@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
 import yaml
@@ -15,18 +16,14 @@ ROOT = Path(__file__).resolve().parent.parent
 GITHUB = "https://github.com"
 HEX40 = re.compile(r"[0-9a-f]{40}")
 TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
-CHECKSUM_LINE = re.compile(r"([0-9a-fA-F]{64})\s+\*?(.+)")
+CHECKSUM_LINE = re.compile(r"([0-9a-f]{64})  (\S+)")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-GITHUB_URL = re.compile(re.escape(GITHUB) + "/" + REPO.pattern)
 FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
 GIT_TIMEOUT = 60
 
 
-def checksum_entry(line: str) -> tuple[str, str] | None:
-    match = CHECKSUM_LINE.fullmatch(line.strip())
-    if not match:
-        return None
-    return match.group(1).lower(), match.group(2).strip().removeprefix("./")
+def _is_repo(value: object) -> bool:
+    return isinstance(value, str) and bool(REPO.fullmatch(value)) and not {".", ".."} & set(value.split("/"))
 
 
 def _is_str(value: object) -> bool:
@@ -77,8 +74,7 @@ def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
 
     prefix = f"{name}: upstream.json"
     problems = []
-    repo = upstream.get("repo")
-    if not (isinstance(repo, str) and REPO.fullmatch(repo)):
+    if not _is_repo(upstream.get("repo")):
         problems.append(f"{prefix} 'repo' must be 'owner/name'")
     tag = upstream.get("tag")
     if not (_is_str(tag) and not TAG_FORBIDDEN.search(tag)):
@@ -97,29 +93,29 @@ def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
 
 def check_checksums(agent_dir: Path, assets: list[str]) -> list[str]:
     name = agent_dir.name
-    if not assets:
-        return []
     path = agent_dir / "checksums.txt"
     if not path.is_file():
-        return [f"{name}: checksums.txt is missing"]
-    present = {entry[1] for line in path.read_text().splitlines() if (entry := checksum_entry(line))}
-    return [f"{name}: checksums.txt has no sha256 for {asset}" for asset in assets if asset not in present]
+        return [f"{name}: checksums.txt is missing"] if assets else []
+    problems = []
+    present = set()
+    for number, line in enumerate(path.read_bytes().decode(errors="replace").split("\n"), 1):
+        if match := CHECKSUM_LINE.fullmatch(line):
+            present.add(match.group(2))
+        elif line:
+            problems.append(f"{name}: checksums.txt line {number} is not '<lowercase sha256>  <file name>'")
+    return problems + [f"{name}: checksums.txt has no sha256 for {asset}" for asset in assets if asset not in present]
 
 
 def check_agent(
     agent_dir: Path,
+    upstream: dict,
     *,
     gitlink: str | None,
     submodule_url: str | None,
     tag_commit: str | None,
 ) -> list[str]:
     name = agent_dir.name
-    problems = check_contract(agent_dir)
-    upstream, upstream_problems = load_upstream(agent_dir)
-    problems += upstream_problems
-    if upstream is None:
-        return problems
-
+    problems = []
     submodule = PurePosixPath(upstream["submodule"]).as_posix()
     if gitlink is None:
         problems.append(f"{name}: submodule {submodule} is missing")
@@ -208,7 +204,7 @@ def check_repo(
         url = fields.get("url")
         if url is None or (path in agent_submodules and name == path):
             continue
-        if not GITHUB_URL.fullmatch(url):
+        if not (url.startswith(f"{GITHUB}/") and _is_repo(url.removeprefix(f"{GITHUB}/"))):
             problems.append(f".gitmodules: submodule {name} URL {url} is not https://github.com/<owner>/<repo>")
     return problems
 
@@ -221,9 +217,16 @@ def parse_tag_commit(ls_remote_output: str, tag: str) -> str | None:
     return refs.get(f"refs/tags/{tag}^{{}}") or refs.get(f"refs/tags/{tag}")
 
 
-def fetch_tag_commit(repo: str, tag: str) -> str | None:
-    out = _git("ls-remote", f"{GITHUB}/{repo}.git", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}", cwd=ROOT)
-    return parse_tag_commit(out, tag)
+def resolve_tag(name: str, upstream: dict) -> tuple[str | None, list[str]]:
+    repo, tag = upstream["repo"], upstream["tag"]
+    try:
+        out = _git("ls-remote", f"{GITHUB}/{repo}.git", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}", cwd=ROOT)
+    except RuntimeError as error:
+        return None, [f"{name}: could not look up tag {tag} in {repo}: {error}"]
+    commit = parse_tag_commit(out, tag)
+    if commit is None:
+        return None, [f"{name}: tag {tag} not found in {repo}"]
+    return commit, []
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -240,37 +243,36 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as error:
         list_error = error
 
+    agent_dirs = sorted(contract.parent for contract in (ROOT / "agents").glob("*/contract.yaml"))
+    upstreams = {agent_dir: load_upstream(agent_dir) for agent_dir in agent_dirs}
+    tags: dict[Path, tuple[str | None, list[str]]] = {}
+    if not args.offline:
+        valid = {agent_dir: upstream for agent_dir, (upstream, _) in upstreams.items() if upstream is not None}
+        with ThreadPoolExecutor() as pool:
+            tags = dict(zip(valid, pool.map(resolve_tag, [agent_dir.name for agent_dir in valid], valid.values())))
+
     problems = []
     agent_submodules: set[str] = set()
     broken_agents: set[str] = set()
-    for contract in sorted((ROOT / "agents").glob("*/contract.yaml")):
-        agent_dir = contract.parent
+    for agent_dir, (upstream, upstream_problems) in upstreams.items():
         name = agent_dir.name
-        upstream, _ = load_upstream(agent_dir)
-
-        gitlink = submodule_url = tag_commit = None
-        lookup_problems = []
-        if upstream is not None:
-            repo, tag = upstream["repo"], upstream["tag"]
-            path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
-            agent_submodules.add(path)
-            gitlink = gitlinks.get(path)
-            submodule_url = modules.get(path, {}).get("url")
-            if list_error is not None:
-                lookup_problems.append(f"{name}: could not read submodule {path} from git: {list_error}")
-            if not args.offline:
-                try:
-                    tag_commit = fetch_tag_commit(repo, tag)
-                except RuntimeError as error:
-                    lookup_problems.append(f"{name}: could not look up tag {tag} in {repo}: {error}")
-                else:
-                    if tag_commit is None:
-                        lookup_problems.append(f"{name}: tag {tag} not found in {repo}")
-        else:
+        problems += check_contract(agent_dir) + upstream_problems
+        if upstream is None:
             broken_agents.add(f"agents/{name}")
-
-        problems += check_agent(agent_dir, gitlink=gitlink, submodule_url=submodule_url, tag_commit=tag_commit)
-        problems += lookup_problems
+            continue
+        path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
+        agent_submodules.add(path)
+        tag_commit, tag_problems = tags.get(agent_dir, (None, []))
+        problems += check_agent(
+            agent_dir,
+            upstream,
+            gitlink=gitlinks.get(path),
+            submodule_url=modules.get(path, {}).get("url"),
+            tag_commit=tag_commit,
+        )
+        if list_error is not None:
+            problems.append(f"{name}: could not read submodule {path} from git: {list_error}")
+        problems += tag_problems
 
     if list_error is not None:
         problems.append(f"could not list the submodules from git: {list_error}")
