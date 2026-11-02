@@ -10,6 +10,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 AGENT = "terminus2"
+UPSTREAM = Path(__file__).with_name("upstream.json")
 MAX_ERROR_CHARS = 512
 # The AgentContext fields copied into summary.json's "metrics".
 METRIC_KEYS = ("n_input_tokens", "n_output_tokens", "n_cache_tokens", "cost_usd", "metadata")
@@ -49,14 +50,13 @@ def parse_options(*, max_turns: str, temperature: str, parser: str, reasoning_ef
     return options
 
 
-def write_summary(
-    out_dir: Path, upstream: dict, *, outcome: str, stop_reason: str, agent_exit_code: int, metrics: dict
-) -> None:
-    """Write ``out_dir/summary.json``. A failure is reported on stderr and never raised, so it
-    cannot change the run's exit code or stop the error line from being written."""
+def write_summary(out_dir: Path, *, outcome: str, stop_reason: str, agent_exit_code: int, metrics: dict) -> None:
+    """Write ``out_dir/summary.json``, recording the upstream.json next to this file. A failure is
+    reported on stderr and never raised, so it cannot change the run's exit code or stop the error
+    line from being written."""
     summary = {
         "agent": AGENT,
-        "upstream": upstream,
+        "upstream": load_upstream(UPSTREAM),
         "outcome": outcome,
         "stop_reason": stop_reason,
         "agent_exit_code": agent_exit_code,

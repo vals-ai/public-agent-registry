@@ -239,6 +239,10 @@ def case(tmp_path, monkeypatch):
     monkeypatch.setenv("VALKYRIE_ERROR_PATH", str(tmp_path / "err"))
     problem = tmp_path / "problem.md"
     problem.write_text("-x 'single' \"double\"\nSECRET TASK TEXT\n")
+    upstream = {"repo": "harbor-framework/harbor", "tag": "v0.25.0"}
+    upstream_file = tmp_path / "upstream.json"
+    upstream_file.write_text(json.dumps(upstream))
+    monkeypatch.setattr(support, "UPSTREAM", upstream_file)
     calls = []
     state = {"exec_code": 0}
 
@@ -259,7 +263,7 @@ def case(tmp_path, monkeypatch):
         out=tmp_path / "out",
         err=tmp_path / "err",
         state=state,
-        upstream={"repo": "harbor-framework/harbor", "tag": "v0.25.0"},
+        upstream=upstream,
         use_agent=use_agent,
     )
 
@@ -270,7 +274,7 @@ def summary(out: Path) -> dict:
 
 async def test_run_follows_harbors_trial_order(case):
     agent = case.use_agent(fake_agent_class())
-    code = await bridge.run(case.problem, "anthropic/m", {"max_turns": 5}, case.out, case.upstream)
+    code = await bridge.run(case.problem, "anthropic/m", {"max_turns": 5}, case.out)
     assert code == 0
     (instance,) = agent.instances
     assert instance.kwargs == {
@@ -298,7 +302,7 @@ async def test_run_success_writes_summary_with_metrics(case):
         "metadata": {"n_episodes": 4, "api_request_times_msec": [1.5], "summarization_count": 0},
     }
     case.use_agent(fake_agent_class(metrics=metrics))
-    assert await bridge.run(case.problem, "m", {}, case.out, case.upstream) == 0
+    assert await bridge.run(case.problem, "m", {}, case.out) == 0
     assert summary(case.out) == {
         "agent": "terminus2",
         "upstream": case.upstream,
@@ -312,7 +316,7 @@ async def test_run_success_writes_summary_with_metrics(case):
 
 async def test_run_error_in_setup(case):
     agent = case.use_agent(fake_agent_class(setup_error=RuntimeError("SECRET TASK TEXT")))
-    assert await bridge.run(case.problem, "m", {}, case.out, case.upstream) == 1
+    assert await bridge.run(case.problem, "m", {}, case.out) == 1
     assert case.err.read_text() == "AgentError: terminus2 RuntimeError\n"
     assert [call[0] for call in agent.calls] == ["setup"]
     assert summary(case.out) == {
@@ -333,7 +337,7 @@ async def test_run_error_in_setup(case):
 
 async def test_run_error_in_run_keeps_metrics_and_hides_text(case):
     case.use_agent(fake_agent_class(run_error=AuthenticationError("SECRET model said"), metrics={"n_input_tokens": 9}))
-    assert await bridge.run(case.problem, "m", {}, case.out, case.upstream) == 1
+    assert await bridge.run(case.problem, "m", {}, case.out) == 1
     assert case.err.read_text() == "AgentError: terminus2 AuthenticationError\n"
     result = summary(case.out)
     assert (result["outcome"], result["stop_reason"]) == ("error", "AuthenticationError")
@@ -344,7 +348,7 @@ async def test_run_error_in_run_keeps_metrics_and_hides_text(case):
 async def test_run_error_when_cd_fails(case):
     agent = case.use_agent(fake_agent_class())
     case.state["exec_code"] = 1
-    assert await bridge.run(case.problem, "m", {}, case.out, case.upstream) == 1
+    assert await bridge.run(case.problem, "m", {}, case.out) == 1
     assert case.err.read_text() == "AgentError: terminus2 RuntimeError\n"
     assert [call[0] for call in agent.calls] == ["setup", "exec"]
 
@@ -355,14 +359,14 @@ async def test_run_error_when_constructor_rejects_options(case):
             raise ValueError("bad option")
 
     agent = case.use_agent(Rejecting)
-    assert await bridge.run(case.problem, "m", {}, case.out, case.upstream) == 1
+    assert await bridge.run(case.problem, "m", {}, case.out) == 1
     assert case.err.read_text() == "AgentError: terminus2 ValueError\n"
     assert agent.calls == []
 
 
 async def test_run_error_when_problem_is_unreadable(case):
     agent = case.use_agent(fake_agent_class())
-    assert await bridge.run(case.problem.with_name("missing.md"), "m", {}, case.out, case.upstream) == 1
+    assert await bridge.run(case.problem.with_name("missing.md"), "m", {}, case.out) == 1
     assert case.err.read_text() == "AgentError: terminus2 FileNotFoundError\n"
     assert agent.calls == []
 
@@ -371,7 +375,7 @@ async def test_run_error_when_problem_is_unreadable(case):
 async def test_run_summary_failure_keeps_code_and_error_line(case, capsys, setup_error):
     case.use_agent(fake_agent_class(setup_error=setup_error))
     case.out.write_text("a file where the output folder should be")
-    code = await bridge.run(case.problem, "m", {}, case.out, case.upstream)
+    code = await bridge.run(case.problem, "m", {}, case.out)
     if setup_error is None:
         assert code == 0
         assert not case.err.exists()
@@ -383,8 +387,6 @@ async def test_run_summary_failure_keeps_code_and_error_line(case, capsys, setup
 
 def main_argv(case, **flags):
     values = {"max_turns": "", "temperature": "", "parser": "", "reasoning_effort": "", **flags}
-    upstream = case.out.parent / "upstream.json"
-    upstream.write_text(json.dumps(case.upstream))
     return [
         str(case.problem),
         "--model", "anthropic/m",
@@ -393,7 +395,6 @@ def main_argv(case, **flags):
         "--parser", values["parser"],
         "--reasoning-effort", values["reasoning_effort"],
         "--output-dir", str(case.out),
-        "--upstream", str(upstream),
     ]  # fmt: skip
 
 
@@ -432,9 +433,8 @@ def test_main_bad_option_is_an_error(case):
     assert (result["outcome"], result["stop_reason"], result["agent_exit_code"]) == ("error", "invalid_options", 1)
 
 
-def test_main_default_upstream_is_the_shipped_file():
+def test_main_defaults():
     args = runner.parse_args(["p", "--model", "m"])
-    assert Path(args.upstream) == AGENT_DIR / "upstream.json"
     assert args.output_dir == "/logs/agent"
     assert (args.max_turns, args.temperature, args.parser, args.reasoning_effort) == ("", "", "", "")
 
@@ -490,7 +490,7 @@ async def test_real_session_starts_in_task_dir_without_keys(tmp_path, monkeypatc
         context.n_input_tokens = 1
 
     monkeypatch.setattr(bridge.Terminus2, "run", fake_run)
-    code = await bridge.run(problem, "anthropic/claude-sonnet-4-6", {}, tmp_path / "out", {})
+    code = await bridge.run(problem, "anthropic/claude-sonnet-4-6", {}, tmp_path / "out")
     assert code == 0, (tmp_path / "err").read_text() if (tmp_path / "err").exists() else ""
     assert where.read_text().strip() == str(task)
     assert "SECRET" not in seen_env.read_text()

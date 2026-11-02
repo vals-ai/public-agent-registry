@@ -67,7 +67,10 @@ def read_summary(out_dir: Path) -> dict:
     return json.loads((out_dir / "summary.json").read_text())
 
 
-def test_write_summary_shape(tmp_path):
+def test_write_summary_shape(tmp_path, monkeypatch):
+    upstream = tmp_path / "upstream.json"
+    upstream.write_text(json.dumps({"repo": "harbor-framework/harbor", "tag": "v0.25.0"}))
+    monkeypatch.setattr(support, "UPSTREAM", upstream)
     metrics = {
         "n_input_tokens": 10,
         "n_output_tokens": 2,
@@ -77,7 +80,6 @@ def test_write_summary_shape(tmp_path):
     }
     support.write_summary(
         tmp_path / "out",
-        {"repo": "harbor-framework/harbor", "tag": "v0.25.0"},
         outcome="completed",
         stop_reason="returned",
         agent_exit_code=0,
@@ -96,14 +98,13 @@ def test_write_summary_shape(tmp_path):
 
 def test_write_summary_replaces_an_old_summary(tmp_path):
     (tmp_path / "summary.json").write_text("old")
-    support.write_summary(tmp_path, {}, outcome="error", stop_reason="X", agent_exit_code=1, metrics={})
+    support.write_summary(tmp_path, outcome="error", stop_reason="X", agent_exit_code=1, metrics={})
     assert read_summary(tmp_path)["outcome"] == "error"
 
 
 def test_write_summary_stringifies_values_json_cannot_hold(tmp_path):
     support.write_summary(
         tmp_path,
-        {},
         outcome="completed",
         stop_reason="returned",
         agent_exit_code=0,
@@ -115,7 +116,7 @@ def test_write_summary_stringifies_values_json_cannot_hold(tmp_path):
 def test_write_summary_failure_is_reported_not_raised(tmp_path, capsys):
     blocker = tmp_path / "file"
     blocker.write_text("")
-    support.write_summary(blocker, {}, outcome="error", stop_reason="X", agent_exit_code=1, metrics={})
+    support.write_summary(blocker, outcome="error", stop_reason="X", agent_exit_code=1, metrics={})
     assert "could not write" in capsys.readouterr().err
 
 
@@ -150,7 +151,8 @@ def test_load_upstream(tmp_path):
 
 
 def test_the_shipped_upstream_json_loads():
-    upstream = support.load_upstream(AGENT_DIR / "upstream.json")
+    assert support.UPSTREAM == AGENT_DIR / "upstream.json"
+    upstream = support.load_upstream(support.UPSTREAM)
     assert upstream["repo"] == "harbor-framework/harbor"
     assert upstream["submodule"] == "harbor"
 
@@ -178,16 +180,15 @@ def test_main_reports_a_harbor_that_cannot_be_imported(tmp_path, monkeypatch):
     spec.loader.exec_module(runner)
     problem = tmp_path / "p.md"
     problem.write_text("SECRET TASK TEXT")
-    upstream = AGENT_DIR / "upstream.json"
     out = tmp_path / "out"
 
-    code = runner.main([str(problem), "--model", "m", "--output-dir", str(out), "--upstream", str(upstream)])
+    code = runner.main([str(problem), "--model", "m", "--output-dir", str(out)])
 
     assert code == 1
     assert (tmp_path / "err").read_text() == "AgentError: terminus2 ModuleNotFoundError\n"
     assert read_summary(out) == {
         "agent": "terminus2",
-        "upstream": support.load_upstream(upstream),
+        "upstream": support.load_upstream(AGENT_DIR / "upstream.json"),
         "outcome": "error",
         "stop_reason": "ModuleNotFoundError",
         "agent_exit_code": 1,

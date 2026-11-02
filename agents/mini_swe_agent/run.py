@@ -27,6 +27,7 @@ from pathlib import Path
 
 AGENT = "mini_swe_agent"
 DEFAULT_OUTPUT_DIR = "/logs/mini_swe_agent"
+UPSTREAM = Path(__file__).with_name("upstream.json")
 NO_TRAJECTORY = "no trajectory"
 MAX_ERROR_CHARS = 512
 STATUS = re.compile(r"\w{1,80}", re.ASCII)
@@ -113,11 +114,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--step-limit", default="", help="max agent steps; empty keeps upstream's default")
     parser.add_argument("--cost-tracking", default="", help="MSWEA_COST_TRACKING value, e.g. ignore_errors")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help=f"default: {DEFAULT_OUTPUT_DIR}")
-    parser.add_argument(
-        "--upstream",
-        default=str(Path(__file__).with_name("upstream.json")),
-        help="upstream.json to record in summary.json (default: next to this file)",
-    )
     return parser.parse_args(argv)
 
 
@@ -174,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
-    summary = summarize(trajectory, load_upstream(Path(args.upstream)), code)
+    summary = summarize(trajectory, load_upstream(UPSTREAM), code)
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     if code != 0:
         status = error_status(summary["stop_reason"])

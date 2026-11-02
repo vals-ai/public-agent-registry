@@ -97,7 +97,7 @@ def test_write_error_truncates_to_one_line_of_512_chars(tmp_path, monkeypatch):
 
 @pytest.fixture
 def mini_env(tmp_path, monkeypatch):
-    """Isolate the process state ``main`` changes: argv and the MSWEA_* variables."""
+    """Isolate the process state ``main`` changes (argv, the MSWEA_* variables) and the upstream.json it records."""
     monkeypatch.setattr(sys, "argv", list(sys.argv))
     for name in ("MSWEA_CONFIGURED", "MSWEA_SILENT_STARTUP", "MSWEA_COST_TRACKING"):
         monkeypatch.setenv(name, "before")
@@ -107,11 +107,12 @@ def mini_env(tmp_path, monkeypatch):
     problem.write_text("SECRET TASK TEXT")
     upstream = tmp_path / "upstream.json"
     upstream.write_text(json.dumps({"repo": "o/r", "tag": "v9"}))
+    monkeypatch.setattr(run, "UPSTREAM", upstream)
     return types.SimpleNamespace(
         problem=problem,
         out=tmp_path / "out",
         err=tmp_path / "err",
-        base=[str(problem), "--model", "m", "--output-dir", str(tmp_path / "out"), "--upstream", str(upstream)],
+        base=[str(problem), "--model", "m", "--output-dir", str(tmp_path / "out")],
     )
 
 

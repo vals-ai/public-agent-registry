@@ -182,7 +182,7 @@ def metrics_of(context: AgentContext) -> dict:
     return {key: getattr(context, key) for key in METRIC_KEYS}
 
 
-async def run(problem: Path, model: str, options: dict, out_dir: Path, upstream: dict) -> int:
+async def run(problem: Path, model: str, options: dict, out_dir: Path) -> int:
     """Run Terminus 2 on the task in ``problem`` from the current folder; return the exit code."""
     cwd = Path.cwd()
     context = AgentContext()
@@ -204,11 +204,7 @@ async def run(problem: Path, model: str, options: dict, out_dir: Path, upstream:
         traceback.print_exc()
         name = type(error).__name__
         write_error(f"AgentError: terminus2 {name}")
-        write_summary(
-            out_dir, upstream, outcome="error", stop_reason=name, agent_exit_code=1, metrics=metrics_of(context)
-        )
+        write_summary(out_dir, outcome="error", stop_reason=name, agent_exit_code=1, metrics=metrics_of(context))
         return 1
-    write_summary(
-        out_dir, upstream, outcome="completed", stop_reason="returned", agent_exit_code=0, metrics=metrics_of(context)
-    )
+    write_summary(out_dir, outcome="completed", stop_reason="returned", agent_exit_code=0, metrics=metrics_of(context))
     return 0

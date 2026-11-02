@@ -26,7 +26,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from terminus2_support import load_upstream, no_metrics, parse_options, write_error, write_summary
+from terminus2_support import no_metrics, parse_options, write_error, write_summary
 
 DEFAULT_OUTPUT_DIR = "/logs/agent"
 
@@ -47,25 +47,19 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--parser", default="", help="json or xml; empty keeps upstream's default (json)")
     parser.add_argument("--reasoning-effort", default="", help="empty sends none")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help=f"default: {DEFAULT_OUTPUT_DIR}")
-    parser.add_argument(
-        "--upstream",
-        default=str(Path(__file__).with_name("upstream.json")),
-        help="upstream.json to record in summary.json (default: next to this file)",
-    )
     return parser.parse_args(argv)
 
 
-def fail(out_dir: Path, upstream: dict, line: str, stop_reason: str) -> int:
+def fail(out_dir: Path, line: str, stop_reason: str) -> int:
     """Report a run that ended before Terminus 2 could record anything: error line, summary, exit 1."""
     write_error(line)
-    write_summary(out_dir, upstream, outcome="error", stop_reason=stop_reason, agent_exit_code=1, metrics=no_metrics())
+    write_summary(out_dir, outcome="error", stop_reason=stop_reason, agent_exit_code=1, metrics=no_metrics())
     return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out_dir = Path(args.output_dir)
-    upstream = load_upstream(Path(args.upstream))
     try:
         options = parse_options(
             max_turns=args.max_turns,
@@ -74,14 +68,14 @@ def main(argv: list[str] | None = None) -> int:
             reasoning_effort=args.reasoning_effort,
         )
     except ValueError as error:
-        return fail(out_dir, upstream, f"AgentError: terminus2 {error}", "invalid_options")
+        return fail(out_dir, f"AgentError: terminus2 {error}", "invalid_options")
     try:
         import terminus2_bridge  # imports Harbor, so a broken install is reported like any failure
     except Exception as error:
         traceback.print_exc()
         name = type(error).__name__
-        return fail(out_dir, upstream, f"AgentError: terminus2 {name}", name)
-    return asyncio.run(terminus2_bridge.run(Path(args.problem), args.model, options, out_dir, upstream))
+        return fail(out_dir, f"AgentError: terminus2 {name}", name)
+    return asyncio.run(terminus2_bridge.run(Path(args.problem), args.model, options, out_dir))
 
 
 if __name__ == "__main__":
