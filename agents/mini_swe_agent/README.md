@@ -1,33 +1,13 @@
 # mini_swe_agent
 
-[mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) by the SWE-agent team, run for Valkyrie
-exactly as upstream ships it. The upstream repository is the `mini-swe-agent/` git submodule, pinned to
-the release recorded in `upstream.json` (`tag` and `commit`). Only `contract.yaml`, `setup.sh`, `run.py`
-and this README are Vals-authored.
+[mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) by the SWE-agent team, the minimal AI software engineering agent, run for Valkyrie as upstream ships it. The pinned upstream release is recorded in `upstream.json`.
 
-## Install
+## Configuration
 
-```bash
-valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/main/agents/mini_swe_agent
-```
-
-`setup.sh` installs uv 0.13.5 (checked against a pinned sha256) and builds a Python 3.12 venv in
-`/opt/mini-swe-agent-venv` from the submodule. The only thing it puts on `PATH` is the
-`mini-swe-agent-run` entry script, which works from whatever folder Valkyrie copies the agent into.
-
-## Run
-
-The agent needs an API key for the model's provider. Pass it as a secret:
-
-```bash
-valkyrie run start --benchmark swebench --agent mini_swe_agent \
-  --model anthropic/claude-sonnet-4-6 -s ANTHROPIC_API_KEY <secret-ref> \
-  -k config benchmarks/swebench.yaml --concurrency 10 --slice :10
-```
-
-`--model` is a [litellm](https://docs.litellm.ai/docs/providers) model name and must include the
-provider, for example `anthropic/claude-sonnet-4-6` or `openai/gpt-5.4`. Use the secret that provider
-expects (`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...).
+- Secret: the API key of the model's provider, for example `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`
+- Model: a [litellm](https://docs.litellm.ai/docs/providers) name that includes the provider, for example `anthropic/claude-sonnet-4-6` or `openai/gpt-5.4`
+- Final output: `/logs/mini_swe_agent`
+- On SWE-bench, pass `-k config benchmarks/swebench.yaml`.
 
 | Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
@@ -36,40 +16,29 @@ expects (`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...).
 | `step_limit` | empty | Maximum agent steps. Empty keeps upstream's default. |
 | `cost_tracking` | empty | Set to `ignore_errors` for models litellm has no price for. |
 
-## Outputs
+## Usage with valkyrie
 
-Written to `/logs/mini_swe_agent/` and collected as `mini_swe_agent/`:
+We assume if you are here that you have [valkyrie](https://github.com/vals-ai/Valkyrie) installed. If not, navigate to the [main repository](https://github.com/vals-ai/Valkyrie) and get started.
 
-- `trajectory.json`: the full run, saved by mini-swe-agent after every step.
-- `summary.json`: `agent`, `upstream` (the contents of `upstream.json`), `outcome`
-  (`completed` or `error`), `stop_reason` (mini-swe-agent's `exit_status`, such as `Submitted`,
-  `LimitsExceeded` or `AuthenticationError`) and `agent_exit_code`. It is written even when the run fails.
-
-The run exits 0 when the agent stops on its own, including when it hits the cost or step limit. Any
-other ending (a bad API key, an unpriced model, a crash) exits 1 with a one-line
-`AgentError: ...` reason for Valkyrie, so the task is skipped rather than graded.
-
-## Quirks
-
-- The agent runs in the benchmark's working directory with mini-swe-agent's `local` environment, so its
-  commands run directly in the sandbox. `run.py` clears `environment.cwd`, so the `/testbed` that
-  `benchmarks/swebench.yaml` sets for Docker runs does not apply.
-- That environment runs each command with `/bin/sh`, not bash.
-- If a model is unknown to litellm, upstream stops with a cost-tracking error. Set
-  `-k cost_tracking ignore_errors` for such models (and `cost_limit` then cannot stop the run).
-- API keys passed with `-s` are environment variables inside the sandbox, so the agent's own commands
-  can read them.
-- The agent's Python runs with `-E`, so the task's `PYTHONPATH`, `PYTHONHOME` and other `PYTHON*`
-  variables cannot change which modules mini-swe-agent and litellm load. The commands the agent runs
-  still have them, as the task set them.
-- `setup.sh` also installs litellm's `mcp` extra. litellm 1.106 imports `mcp` on every request that
-  carries tools (mini-swe-agent's always do) without declaring it as a dependency.
-
-## Updating
+Install the agent from github using valkyrie for future use
 
 ```bash
-uv run python scripts/bump_agent.py agents/mini_swe_agent
+valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/main/agents/mini_swe_agent
 ```
 
-picks the newest upstream release that is at least seven days old, checks it out in the submodule and
-rewrites `upstream.json`.
+Run a benchmark using mini_swe_agent as the agent, specify `--model <MODEL>` to change the underlying model
+
+```bash
+valkyrie run start --benchmark swebench --agent mini_swe_agent \
+  --model anthropic/claude-sonnet-4-6 -s ANTHROPIC_API_KEY <secret-ref> \
+  -k config benchmarks/swebench.yaml --concurrency 10 --slice :10
+```
+
+## Output Files
+
+The run writes to `/logs/mini_swe_agent/`:
+
+- `summary.json`: the agent, the upstream release that ran, the outcome and the stop reason
+- `trajectory.json`: the full run, step by step
+
+List them for a run with `valkyrie run artifacts RUN_ID`.

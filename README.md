@@ -19,7 +19,7 @@ upstream code is a git submodule inside it, pinned to a release tag.
 
 Each agent is pinned to an upstream release tag. The `tag` and `commit` are in the agent's
 `agents/<agent-name>/upstream.json`, which the weekly bump pull requests update.
-Each agent's README lists its model names, kwargs, outputs and quirks.
+Each agent's README lists its secrets, model names, kwargs and output files.
 
 ## Repository Layout
 
