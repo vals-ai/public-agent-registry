@@ -254,23 +254,30 @@ def test_fetch_tag_commit_raises_when_the_remote_cannot_be_read(tmp_path, monkey
 # Reading gitlinks from the index.
 
 
-def test_read_gitlink_sees_a_staged_gitlink_before_any_commit(tmp_path):
+def test_read_gitlinks_sees_a_staged_gitlink_before_any_commit(tmp_path):
     git(tmp_path, "init", "-q")
     git(tmp_path, "update-index", "--add", "--cacheinfo", f"160000,{A},agents/x/r")
-    assert check_agents.read_gitlink(tmp_path, "agents/x/r") == A
+    assert check_agents.read_gitlinks(tmp_path) == {"agents/x/r": A}
 
 
-def test_read_gitlink_is_none_without_an_entry(tmp_path):
+def test_read_gitlinks_is_empty_without_an_entry(tmp_path):
     git(tmp_path, "init", "-q")
-    assert check_agents.read_gitlink(tmp_path, "agents/x/r") is None
+    assert check_agents.read_gitlinks(tmp_path) == {}
 
 
-def test_read_gitlink_is_none_for_a_plain_directory(tmp_path):
+def test_read_gitlinks_skips_a_plain_directory(tmp_path):
     git(tmp_path, "init", "-q")
     (tmp_path / "agents" / "x" / "r").mkdir(parents=True)
     (tmp_path / "agents" / "x" / "r" / "f").write_text("1")
     git(tmp_path, "add", "agents/x/r/f")
-    assert check_agents.read_gitlink(tmp_path, "agents/x/r") is None
+    assert check_agents.read_gitlinks(tmp_path) == {}
+
+
+def test_read_gitlinks_has_no_commit_for_a_conflicted_entry(tmp_path):
+    git(tmp_path, "init", "-q")
+    entries = "".join(f"160000 {A} {stage}\tagents/x/r\n" for stage in (1, 2, 3))
+    subprocess.run(["git", "update-index", "--index-info"], cwd=tmp_path, input=entries, text=True, check=True)
+    assert check_agents.read_gitlinks(tmp_path) == {"agents/x/r": None}
 
 
 # main() against a throwaway git repository.
@@ -329,6 +336,17 @@ def test_main_reports_when_git_cannot_read_the_submodule(registry, tmp_path, cap
     assert check_agents.main(["--offline"]) == 1
     out = capsys.readouterr().out
     assert out.startswith("x: submodule r is missing\nx: could not read submodule agents/x/r from git: ")
+
+
+def test_main_reports_when_git_cannot_read_gitmodules(registry, tmp_path, capsys):
+    registry()
+    (tmp_path / ".gitmodules").write_text('[submodule "x\n  path = oops\n')  # `git config -f` cannot parse it
+    assert check_agents.main(["--offline"]) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "x: submodule r has no URL in .gitmodules"  # the gitlink itself was read
+    assert lines[1].startswith("x: could not read submodule agents/x/r from git: ")
+    assert lines[2].startswith("could not list the submodules from git: ")
+    assert len(lines) == 3
 
 
 def test_main_reads_the_gitlink_from_the_index_not_head(registry, tmp_path, capsys):
@@ -496,7 +514,7 @@ def test_read_gitlinks_and_gitmodules(tmp_path):
     git(tmp_path, "add", "f")
     git(tmp_path, "config", "-f", ".gitmodules", "submodule.a.b/c.path", "a.b/c")
     git(tmp_path, "config", "-f", ".gitmodules", "submodule.a.b/c.url", "git@github.com:o/r.git")
-    assert check_agents.read_gitlinks(tmp_path) == ["agents/x/r", "dir with space/s"]
+    assert check_agents.read_gitlinks(tmp_path) == {"agents/x/r": A, "dir with space/s": A}
     assert check_agents.read_gitmodules(tmp_path) == {"a.b/c": {"path": "a.b/c", "url": "git@github.com:o/r.git"}}
 
 

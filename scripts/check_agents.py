@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
 import yaml
@@ -197,30 +198,21 @@ def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
     return result.stdout
 
 
-def read_gitlink(root: Path, path: str) -> str | None:
-    """The commit a submodule is pinned to in the index, or None if ``path`` is not a gitlink.
+def read_gitlinks(root: Path) -> dict[str, str | None]:
+    """Every submodule (mode 160000) entry in the index, in index order, as {path: commit}.
 
-    The index equals HEAD in a fresh checkout and also reflects a staged (not yet committed)
-    bump, which is what the bump workflow checks before it commits.
+    The commit is None for a conflicted entry (a stage above 0): the path is a submodule, but it
+    is pinned to no single commit. The index equals HEAD in a fresh checkout and also reflects a
+    staged (not yet committed) bump, which is what the bump workflow checks before it commits.
     """
-    out = _git("ls-files", "-s", "--", path, cwd=root)
-    for line in out.splitlines():
-        meta, _, entry = line.partition("\t")
-        mode, sha, stage = meta.split()
-        if entry == path and mode == "160000" and stage == "0":
-            return sha
-    return None
-
-
-def read_gitlinks(root: Path) -> list[str]:
-    """Paths of every submodule (mode 160000) entry in the index, in index order."""
     out = _git("ls-files", "--stage", "-z", cwd=root)
-    paths = []
+    gitlinks: dict[str, str | None] = {}
     for entry in out.split("\0"):
         meta, _, path = entry.partition("\t")
-        if path and meta.split()[0] == "160000" and path not in paths:
-            paths.append(path)
-    return paths
+        if path and meta.split()[0] == "160000":
+            _, sha, stage = meta.split()
+            gitlinks[path] = sha if stage == "0" else None
+    return gitlinks
 
 
 def read_gitmodules(root: Path) -> dict[str, dict[str, str]]:
@@ -236,7 +228,7 @@ def read_gitmodules(root: Path) -> dict[str, dict[str, str]]:
 
 
 def check_repo(
-    gitlinks: list[str],
+    gitlinks: Iterable[str],
     modules: dict[str, dict[str, str]],
     agent_submodules: set[str],
     broken_agents: set[str] = frozenset(),
@@ -270,12 +262,6 @@ def check_repo(
         if not GITHUB_URL.fullmatch(url):
             problems.append(f".gitmodules: submodule {name} URL {url} is not https://github.com/<owner>/<repo>")
     return problems
-
-
-def read_submodule_url(root: Path, path: str) -> str | None:
-    """The submodule's URL in .gitmodules, or None if it has none."""
-    out = _git("config", "-f", ".gitmodules", f"submodule.{path}.url", cwd=root, allow_exit_1=True)
-    return out.strip() if out else None
 
 
 def parse_tag_commit(ls_remote_output: str, tag: str) -> str | None:
@@ -312,6 +298,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--offline", action="store_true", help="skip resolving upstream tags over the network")
     args = parser.parse_args(argv)
 
+    gitlinks: dict[str, str | None] = {}
+    modules: dict[str, dict[str, str]] = {}
+    list_error = None
+    try:
+        gitlinks = read_gitlinks(ROOT)
+        modules = read_gitmodules(ROOT)
+    except RuntimeError as error:
+        list_error = error
+
     problems = []
     agent_submodules: set[str] = set()
     broken_agents: set[str] = set()
@@ -326,11 +321,10 @@ def main(argv: list[str] | None = None) -> int:
             repo, tag = upstream["repo"], upstream["tag"]
             path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
             agent_submodules.add(path)
-            try:
-                gitlink = read_gitlink(ROOT, path)
-                submodule_url = read_submodule_url(ROOT, path)
-            except RuntimeError as error:
-                lookup_problems.append(f"{name}: could not read submodule {path} from git: {error}")
+            gitlink = gitlinks.get(path)
+            submodule_url = modules.get(path, {}).get("url")  # what `git config submodule.<path>.url` reads
+            if list_error is not None:
+                lookup_problems.append(f"{name}: could not read submodule {path} from git: {list_error}")
             if not args.offline:
                 try:
                     tag_commit = fetch_tag_commit(repo, tag)
@@ -345,11 +339,8 @@ def main(argv: list[str] | None = None) -> int:
         problems += check_agent(agent_dir, gitlink=gitlink, submodule_url=submodule_url, tag_commit=tag_commit)
         problems += lookup_problems
 
-    try:
-        gitlinks = read_gitlinks(ROOT)
-        modules = read_gitmodules(ROOT)
-    except RuntimeError as error:
-        problems.append(f"could not list the submodules from git: {error}")
+    if list_error is not None:
+        problems.append(f"could not list the submodules from git: {list_error}")
     else:
         problems += check_repo(gitlinks, modules, agent_submodules, broken_agents)
 
