@@ -77,12 +77,12 @@ def _current_version(current_tag: str) -> tuple[int, ...]:
     return version
 
 
-def _old_enough(releases: list[Release], now: datetime, min_age: timedelta) -> list[tuple[tuple[int, ...], Release]]:
-    """(version, release) for every release with a plain version tag that is at least ``min_age`` old."""
+def _old_enough(releases: list[Release], now: datetime) -> list[tuple[tuple[int, ...], Release]]:
+    """(version, release) for every release with a plain version tag that is at least ``MIN_AGE`` old."""
     found = []
     for release in releases:
         version = parse_version(release.tag)
-        if version is not None and now - release.published_at >= min_age:
+        if version is not None and now - release.published_at >= MIN_AGE:
             found.append((version, release))
     return found
 
@@ -93,7 +93,6 @@ def pick_release(
     *,
     track: str | None,
     now: datetime,
-    min_age: timedelta = MIN_AGE,
 ) -> Release | None:
     """The highest-version release newer than ``current_tag`` and old enough, on the tracked line.
 
@@ -102,22 +101,16 @@ def pick_release(
     current = _current_version(current_tag)
     candidates = [
         (version, release)
-        for version, release in _old_enough(releases, now, min_age)
+        for version, release in _old_enough(releases, now)
         if version > current and (release.tag.startswith(track) if track else version[0] == current[0])
     ]
     return max(candidates, key=lambda pair: pair[0])[1] if candidates else None
 
 
-def newer_major(
-    releases: list[Release],
-    current_tag: str,
-    *,
-    now: datetime,
-    min_age: timedelta = MIN_AGE,
-) -> Release | None:
+def newer_major(releases: list[Release], current_tag: str, *, now: datetime) -> Release | None:
     """The highest-version old-enough release whose major version is above ``current_tag``'s."""
     current = _current_version(current_tag)
-    candidates = [(version, release) for version, release in _old_enough(releases, now, min_age) if version[0] > current[0]]
+    candidates = [(version, release) for version, release in _old_enough(releases, now) if version[0] > current[0]]
     return max(candidates, key=lambda pair: pair[0])[1] if candidates else None
 
 
@@ -192,9 +185,7 @@ def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[st
     file lists is downloaded and hashed. Lines for other files (jq) stay first, in their order,
     then come the assets, in ``assets`` order. Nothing is written if a download fails.
     """
-    assets = upstream.get("assets") or []
-    if not assets:
-        return
+    assets = upstream["assets"]
     base = f"{GITHUB}/{upstream['repo']}/releases/download/{upstream['tag']}"
 
     digests: dict[str, str] = {}
@@ -226,11 +217,11 @@ def refresh_checksums(agent_dir: Path, upstream: dict, *, download: Callable[[st
     path.write_text("\n".join(lines) + "\n")
 
 
-def pin(agent_dir: Path, tag: str, *, git: Callable[..., str], download: Callable[[str], bytes]) -> dict:
+def pin(agent_dir: Path, tag: str, *, git: Callable[..., str], download: Callable[[str], bytes]) -> None:
     """Check ``tag`` out in the agent's submodule and record it in upstream.json (and checksums.txt).
 
-    ``git(*args, cwd=...)`` runs git and returns stdout. Returns the new upstream dict. Nothing is
-    staged or committed, and upstream.json is left alone if the checkout or checksums fail.
+    ``git(*args, cwd=...)`` runs git and returns stdout. Nothing is staged or committed, and
+    upstream.json is left alone if the checkout or checksums fail.
     """
     if not tag or tag.startswith("-") or TAG_FORBIDDEN.search(tag):
         raise ValueError(f"{tag!r} is not a usable tag name")
@@ -248,7 +239,6 @@ def pin(agent_dir: Path, tag: str, *, git: Callable[..., str], download: Callabl
     if upstream.get("assets"):
         refresh_checksums(agent_dir, upstream, download=download)
     path.write_text(json.dumps(upstream, indent=2) + "\n")
-    return upstream
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -267,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         if target is None:
             releases = fetch_releases(upstream["repo"])
             now = datetime.now(UTC)
-            track = upstream.get("track") or None
+            track = upstream.get("track")
             picked = pick_release(releases, current, track=track, now=now)
             target = picked.tag if picked else None
             major = newer_major(releases, current, now=now)

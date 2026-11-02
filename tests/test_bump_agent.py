@@ -79,12 +79,6 @@ def test_pick_release_min_age_is_inclusive():
     assert pick_release([just_under], "v1.0.0", track=None, now=NOW) is None
 
 
-def test_pick_release_respects_custom_min_age():
-    releases = [rel("v1.0.1", 30)]
-    assert pick_release(releases, "v1.0.0", track=None, now=NOW) is None
-    assert pick_release(releases, "v1.0.0", track=None, now=NOW, min_age=timedelta(days=1)).tag == "v1.0.1"
-
-
 def test_pick_release_stays_on_major_and_reports_newer_major():
     releases = [rel("v2.2.5", 1), rel("v1.19.4", 22)]
     assert pick_release(releases, "v1.19.4", track=None, now=NOW) is None
@@ -307,11 +301,10 @@ class FakeGit:
 def test_pin_rewrites_upstream_json(tmp_path):
     make_upstream(tmp_path)
     git = FakeGit()
-    result = pin(tmp_path, "v1.1.0", git=git, download=pytest.fail)
+    pin(tmp_path, "v1.1.0", git=git, download=pytest.fail)
     assert json.loads((tmp_path / "upstream.json").read_text()) == {
         "repo": "o/r", "tag": "v1.1.0", "commit": "f" * 40, "submodule": "r", "track": "v1."
     }
-    assert result == {"repo": "o/r", "tag": "v1.1.0", "commit": "f" * 40, "submodule": "r", "track": "v1."}
     # exactly these git commands, in the submodule, and nothing that stages or commits
     assert git.calls == [
         (("fetch", "--depth", "1", "origin", "tag", "v1.1.0"), tmp_path / "r"),
@@ -338,8 +331,9 @@ def test_pin_keeps_key_order_and_formats_json(tmp_path):
 
 def test_pin_first_pin_from_empty_tag_and_commit(tmp_path):
     make_upstream(tmp_path, tag="", commit="")
-    result = pin(tmp_path, "v1.1.0", git=FakeGit(head="b" * 40), download=pytest.fail)
-    assert (result["tag"], result["commit"]) == ("v1.1.0", "b" * 40)
+    pin(tmp_path, "v1.1.0", git=FakeGit(head="b" * 40), download=pytest.fail)
+    upstream = json.loads((tmp_path / "upstream.json").read_text())
+    assert (upstream["tag"], upstream["commit"]) == ("v1.1.0", "b" * 40)
 
 
 def test_pin_refreshes_checksums_when_assets_are_set(tmp_path):
@@ -352,9 +346,9 @@ def test_pin_refreshes_checksums_when_assets_are_set(tmp_path):
         requested.append(url)
         return sums.encode()
 
-    result = pin(tmp_path, "v1.1.0", git=FakeGit(), download=download)
+    pin(tmp_path, "v1.1.0", git=FakeGit(), download=download)
     assert requested == ["https://github.com/o/r/releases/download/v1.1.0/SHA256SUMS"]
-    assert result["assets"] == ["tool.tar.gz"]
+    assert json.loads((tmp_path / "upstream.json").read_text())["assets"] == ["tool.tar.gz"]
     assert (tmp_path / "checksums.txt").read_text() == f"{'1'*64}  jq-linux-amd64\n{'9'*64}  tool.tar.gz\n"
 
 
@@ -421,8 +415,7 @@ def test_pin_with_real_git_checks_out_the_tag_commit(tmp_path):
     git("clone", "-q", str(upstream_repo), "r", cwd=agent)
     make_upstream(agent, tag="", commit="")
 
-    result = pin(agent, "v1.0.0", git=run_git, download=pytest.fail)
-    assert result["commit"] == tagged
+    pin(agent, "v1.0.0", git=run_git, download=pytest.fail)
     assert git("rev-parse", "HEAD", cwd=agent / "r").strip() == tagged
     assert json.loads((agent / "upstream.json").read_text())["commit"] == tagged
 
@@ -447,7 +440,6 @@ def pins(monkeypatch):
 
     def fake_pin(agent_dir, tag, *, git, download):
         calls.append((agent_dir, tag))
-        return {}
 
     monkeypatch.setattr(bump_agent, "pin", fake_pin)
     return calls
