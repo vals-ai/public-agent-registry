@@ -88,6 +88,7 @@ def stream_codex(command: list[str], env: dict[str, str]) -> tuple[int, list[dic
     ):
         process = subprocess.Popen(
             command,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
