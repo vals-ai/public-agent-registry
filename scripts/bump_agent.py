@@ -122,7 +122,10 @@ def newer_major(
 
 
 def fetch_releases(repo: str) -> list[Release]:
-    """Every published, non-prerelease GitHub release of ``repo`` (owner/name), newest first."""
+    """Every published, non-prerelease GitHub release of ``repo`` (owner/name), in the API's order.
+
+    The order is not relied on: callers compare versions, not positions.
+    """
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",

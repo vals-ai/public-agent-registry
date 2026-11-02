@@ -297,6 +297,7 @@ def registry(tmp_path, monkeypatch, make_agent):
 
 
 def test_main_with_no_agents_is_silent(tmp_path, monkeypatch, capsys):
+    git(tmp_path, "init", "-q")
     (tmp_path / "agents").mkdir()
     (tmp_path / "agents" / ".gitkeep").write_text("")
     monkeypatch.setattr(check_agents, "ROOT", tmp_path)
@@ -418,3 +419,125 @@ def test_main_checks_every_agent(tmp_path, monkeypatch, make_agent, capsys):
     monkeypatch.setattr(check_agents, "ROOT", tmp_path)
     assert check_agents.main(["--offline"]) == 1
     assert capsys.readouterr().out == "a2: contract name 'zzz' does not match folder\n"
+
+
+# Submodules across the whole repository.
+
+
+def test_check_repo_accepts_agent_submodules_and_https_urls():
+    modules = {
+        "agents/x/r": {"path": "agents/x/r", "url": "https://github.com/o/r.git"},
+        "examples/e": {"path": "examples/e", "url": "https://github.com/o/e"},  # .gitmodules entry, no gitlink
+    }
+    assert check_agents.check_repo(["agents/x/r"], modules, {"agents/x/r"}) == []
+
+
+@pytest.mark.parametrize("path", ["examples/x", "agents/foo/r", "agents/x/other", "r"])
+def test_check_repo_reports_a_stray_gitlink(path):
+    assert check_agents.check_repo(["agents/x/r", path], {}, {"agents/x/r"}) == [
+        f"{path}: submodule does not belong to an agent "
+        "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)"
+    ]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@github.com:o/r.git",
+        "http://github.com/o/r.git",
+        "ssh://git@github.com/o/r.git",
+        "https://gitlab.com/o/r.git",
+        "https://github.com/o",
+        "https://github.com/o/r/",
+        "https://github.com/o/r/tree/main",
+        "file:///tmp/r",
+        "../r",
+    ],
+)
+def test_check_repo_reports_a_url_that_is_not_https_github(url):
+    modules = {"examples/e": {"path": "examples/e", "url": url}}
+    assert check_agents.check_repo([], modules, {"agents/x/r"}) == [
+        f".gitmodules: submodule examples/e URL {url} is not https://github.com/<owner>/<repo>"
+    ]
+
+
+def test_check_repo_leaves_an_agents_own_url_to_the_agent_check():
+    modules = {"agents/x/r": {"path": "agents/x/r", "url": "git@github.com:o/r.git"}}
+    assert check_agents.check_repo(["agents/x/r"], modules, {"agents/x/r"}) == []
+
+
+def test_read_gitlinks_and_gitmodules(tmp_path):
+    git(tmp_path, "init", "-q")
+    git(tmp_path, "update-index", "--add", "--cacheinfo", f"160000,{A},agents/x/r")
+    git(tmp_path, "update-index", "--add", "--cacheinfo", f"160000,{A},dir with space/s")
+    (tmp_path / "f").write_text("1")
+    git(tmp_path, "add", "f")
+    git(tmp_path, "config", "-f", ".gitmodules", "submodule.a.b/c.path", "a.b/c")
+    git(tmp_path, "config", "-f", ".gitmodules", "submodule.a.b/c.url", "git@github.com:o/r.git")
+    assert check_agents.read_gitlinks(tmp_path) == ["agents/x/r", "dir with space/s"]
+    assert check_agents.read_gitmodules(tmp_path) == {"a.b/c": {"path": "a.b/c", "url": "git@github.com:o/r.git"}}
+
+
+def test_read_gitmodules_without_a_file(tmp_path):
+    git(tmp_path, "init", "-q")
+    assert check_agents.read_gitmodules(tmp_path) == {}
+
+
+def add_submodule(root, path, url, commit=A):
+    git(root, "update-index", "--add", "--cacheinfo", f"160000,{commit},{path}")
+    git(root, "config", "-f", ".gitmodules", f"submodule.{path}.path", path)
+    git(root, "config", "-f", ".gitmodules", f"submodule.{path}.url", url)
+    git(root, "add", ".gitmodules")
+
+
+@pytest.mark.parametrize("path", ["examples/x", "agents/foo/r"])
+def test_main_reports_a_stray_submodule(registry, tmp_path, capsys, path):
+    registry()
+    (tmp_path / "agents" / "foo").mkdir()  # a folder with no contract.yaml, so no agent checks it
+    add_submodule(tmp_path, path, f"https://github.com/o/{path.replace('/', '-')}.git")
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out == (
+        f"{path}: submodule does not belong to an agent "
+        "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)\n"
+    )
+
+
+def test_main_reports_a_gitmodules_url_that_is_not_https(registry, tmp_path, capsys):
+    registry()
+    git(tmp_path, "config", "-f", ".gitmodules", "submodule.examples/x.path", "examples/x")
+    git(tmp_path, "config", "-f", ".gitmodules", "submodule.examples/x.url", "git@github.com:o/x.git")
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out == (
+        ".gitmodules: submodule examples/x URL git@github.com:o/x.git is not https://github.com/<owner>/<repo>\n"
+    )
+
+
+def test_main_reports_a_stray_submodule_with_a_bad_url_twice(registry, tmp_path, capsys):
+    registry()
+    add_submodule(tmp_path, "examples/x", "git@github.com:o/x.git")
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out.splitlines() == [
+        "examples/x: submodule does not belong to an agent "
+        "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)",
+        ".gitmodules: submodule examples/x URL git@github.com:o/x.git is not https://github.com/<owner>/<repo>",
+    ]
+
+
+def test_main_reports_an_agents_bad_url_once(registry, capsys):
+    registry(url="http://github.com/o/r.git")
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out == "x: submodule URL http://github.com/o/r.git is not https://github.com/o/r.git\n"
+
+
+def test_check_repo_leaves_a_broken_agents_submodules_to_the_agent_check():
+    assert check_agents.check_repo(["agents/x/r", "agents/xy/r"], {}, set(), {"agents/x"}) == [
+        "agents/xy/r: submodule does not belong to an agent "
+        "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)"
+    ]
+
+
+def test_main_reports_when_git_cannot_list_the_submodules(tmp_path, monkeypatch, capsys):
+    (tmp_path / "agents").mkdir()  # not a git repository
+    monkeypatch.setattr(check_agents, "ROOT", tmp_path)
+    assert check_agents.main(["--offline"]) == 1
+    assert capsys.readouterr().out.startswith("could not list the submodules from git: ")

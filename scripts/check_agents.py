@@ -10,6 +10,10 @@ release, and the upstream repo as a git submodule. This script verifies that tho
 * upstream.json's tag resolves to that commit upstream (skipped with --offline),
 * every release asset has a sha256 line in checksums.txt.
 
+Across the whole repository it also checks that every submodule in the index is some agent's
+``agents/<agent>/<submodule>`` from its upstream.json, and that every URL in .gitmodules is
+``https://github.com/<owner>/<repo>`` (``.git`` optional).
+
 Usage: python scripts/check_agents.py [--offline]
 Prints one line per problem and exits 1 if there are any.
 """
@@ -29,6 +33,7 @@ GITHUB = "https://github.com"
 
 HEX40 = re.compile(r"[0-9a-f]{40}")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+GITHUB_URL = re.compile(re.escape(GITHUB) + "/" + REPO.pattern)
 TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
 CHECKSUM_LINE = re.compile(r"([0-9a-fA-F]{64})\s+\*?(.+)")
 FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
@@ -207,6 +212,58 @@ def read_gitlink(root: Path, path: str) -> str | None:
     return None
 
 
+def read_gitlinks(root: Path) -> list[str]:
+    """Paths of every submodule (mode 160000) entry in the index, in index order."""
+    out = _git("ls-files", "--stage", "-z", cwd=root)
+    paths = []
+    for entry in out.split("\0"):
+        meta, _, path = entry.partition("\t")
+        if path and meta.split()[0] == "160000" and path not in paths:
+            paths.append(path)
+    return paths
+
+
+def read_gitmodules(root: Path) -> dict[str, dict[str, str]]:
+    """Every ``submodule.<name>.<field>`` in .gitmodules, as {name: {field: value}}."""
+    out = _git("config", "-f", ".gitmodules", "-z", "--get-regexp", r"^submodule\.", cwd=root, allow_exit_1=True)
+    modules: dict[str, dict[str, str]] = {}
+    for entry in (out or "").split("\0"):
+        key, _, value = entry.partition("\n")
+        name, dot, field = key.removeprefix("submodule.").rpartition(".")
+        if dot:
+            modules.setdefault(name, {})[field] = value
+    return modules
+
+
+def check_repo(
+    gitlinks: list[str],
+    modules: dict[str, dict[str, str]],
+    agent_submodules: set[str],
+    broken_agents: set[str] = frozenset(),
+) -> list[str]:
+    """Problems with submodules outside the agents' own checks.
+
+    ``agent_submodules`` holds ``agents/<agent>/<submodule>`` for every agent whose upstream.json
+    is valid, and ``broken_agents`` the ``agents/<agent>`` folders whose upstream.json is not (they
+    are already reported, so the submodules inside them are not reported again). Any other gitlink
+    is a stray submodule. The URL of every .gitmodules entry that is not an agent's submodule must
+    be an HTTPS GitHub repository; an agent's own URL is compared with its upstream.json instead.
+    """
+    problems = [
+        f"{path}: submodule does not belong to an agent "
+        "(each submodule must be agents/<agent>/<submodule> from that agent's upstream.json)"
+        for path in gitlinks
+        if path not in agent_submodules and not any(path.startswith(f"{folder}/") for folder in broken_agents)
+    ]
+    for name, fields in modules.items():
+        url = fields.get("url")
+        if url is None or fields.get("path") in agent_submodules:
+            continue
+        if not GITHUB_URL.fullmatch(url):
+            problems.append(f".gitmodules: submodule {name} URL {url} is not https://github.com/<owner>/<repo>")
+    return problems
+
+
 def read_submodule_url(root: Path, path: str) -> str | None:
     """The submodule's URL in .gitmodules, or None if it has none."""
     out = _git("config", "-f", ".gitmodules", f"submodule.{path}.url", cwd=root, allow_exit_1=True)
@@ -248,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     problems = []
+    agent_submodules: set[str] = set()
+    broken_agents: set[str] = set()
     for contract in sorted((ROOT / "agents").glob("*/contract.yaml")):
         agent_dir = contract.parent
         name = agent_dir.name
@@ -258,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         if upstream is not None:
             repo, tag = upstream["repo"], upstream["tag"]
             path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
+            agent_submodules.add(path)
             try:
                 gitlink = read_gitlink(ROOT, path)
                 submodule_url = read_submodule_url(ROOT, path)
@@ -271,9 +331,19 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     if tag_commit is None:
                         lookup_problems.append(f"{name}: tag {tag} not found in {repo}")
+        else:
+            broken_agents.add(f"agents/{name}")
 
         problems += check_agent(agent_dir, gitlink=gitlink, submodule_url=submodule_url, tag_commit=tag_commit)
         problems += lookup_problems
+
+    try:
+        gitlinks = read_gitlinks(ROOT)
+        modules = read_gitmodules(ROOT)
+    except RuntimeError as error:
+        problems.append(f"could not list the submodules from git: {error}")
+    else:
+        problems += check_repo(gitlinks, modules, agent_submodules, broken_agents)
 
     for problem in problems:
         print(problem)
