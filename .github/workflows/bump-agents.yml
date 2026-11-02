@@ -285,7 +285,9 @@ jobs:
             lease=$(git rev-parse FETCH_HEAD)
             branch_tag=$(git show "FETCH_HEAD:agents/$AGENT/upstream.json" | jq -r '.tag // ""') || branch_tag=""
             [[ $branch_tag =~ $version ]] || branch_tag=""
-            others=$(git log --format='%an <%ae>' HEAD..FETCH_HEAD | awk -v bot="$bot" '$0 != bot { n++ } END { print n + 0 }')
+            # A maintainer who amends the bot's commit keeps the bot as author, so check the committer too.
+            others=$(git log --format='%an <%ae>%x09%cn <%ce>' HEAD..FETCH_HEAD |
+              awk -F '\t' -v bot="$bot" '$1 != bot || $2 != bot { n++ } END { print n + 0 }')
             if [ "$branch_tag" = "$TO" ]; then
               push=false
               echo "bump-$AGENT is already at $TO, so it is left as it is."
