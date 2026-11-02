@@ -1,0 +1,16 @@
+name: terminus2
+install_cmd: bash setup.sh
+run_cmd: >-
+  terminus2-run "{problem_statement_path}" --model "{model}" --max-turns "{max_turns}"
+  --temperature "{temperature}" --parser "{parser}" --reasoning-effort "{reasoning_effort}"
+final_output: /logs/agent
+output_artifacts:
+  - {path: terminus2/trajectory.json, source: /logs/agent/trajectory.json, required: false}
+  - {path: terminus2/summary.json, source: /logs/agent/summary.json, required: false}
+defaults:
+  model: {type: str, required: true, description: "litellm model name, e.g. anthropic/claude-sonnet-4-6"}
+kwargs:
+  max_turns: {type: str, required: false, default: ""}
+  temperature: {type: str, required: false, default: ""}
+  parser: {type: str, required: false, default: "", description: "json or xml"}
+  reasoning_effort: {type: str, required: false, default: ""}

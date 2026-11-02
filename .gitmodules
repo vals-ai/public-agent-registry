@@ -10,3 +10,7 @@
 	path = agents/pi/pi
 	url = https://github.com/earendil-works/pi.git
 	shallow = true
+[submodule "agents/terminus2/harbor"]
+	path = agents/terminus2/harbor
+	url = https://github.com/harbor-framework/harbor.git
+	shallow = true
