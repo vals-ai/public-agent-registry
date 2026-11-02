@@ -384,7 +384,7 @@ jobs:
         run: |
           repo=$(jq -r .repo "agents/$AGENT/upstream.json")
           case "$AGENT" in
-            mini_swe_agent) run_args="--benchmark swebench -k config=benchmarks/swebench.yaml" ;;
+            mini_swe_agent) run_args="--benchmark swebench -k config benchmarks/swebench.yaml" ;;
             terminus2) run_args="--benchmark terminal-bench --dataset terminal-bench-2.1" ;;
             *) run_args="--benchmark swebench" ;;
           esac

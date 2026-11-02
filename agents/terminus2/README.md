@@ -43,7 +43,7 @@ valkyrie run start --benchmark terminal-bench --dataset terminal-bench-2.1 --age
 provider, for example `anthropic/claude-sonnet-4-6`, `openai/gpt-5.4` or `gemini/gemini-2.5-pro`. Use
 the secret that provider expects (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, ...).
 
-| Kwarg (`-k name=value`) | Default | Meaning |
+| Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
 | `max_turns` | empty | Maximum agent turns. Empty keeps upstream's default, no practical limit. |
 | `temperature` | empty | Sampling temperature. Empty sends none, so the provider's default applies. |

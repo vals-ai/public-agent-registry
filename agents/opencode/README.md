@@ -27,14 +27,14 @@ The agent needs an API key for the model's provider. Pass it as a secret:
 ```bash
 valkyrie run start --benchmark swebench --agent opencode \
   --model anthropic/claude-sonnet-4-6 -s ANTHROPIC_API_KEY <secret-ref> \
-  -k variant=high --concurrency 10 --slice :10
+  -k variant high --concurrency 10 --slice :10
 ```
 
 `--model` is opencode's `provider/model` form, for example `anthropic/claude-sonnet-4-6` or
 `openai/gpt-5.4`, and `opencode models` lists them. Use the secret that provider expects
 (`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...).
 
-| Kwarg (`-k name=value`) | Default | Meaning |
+| Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
 | `variant` | empty | The provider's reasoning effort (`--variant`, for example `high`). Empty keeps the provider default. |
 

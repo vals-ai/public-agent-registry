@@ -22,14 +22,14 @@ The agent needs an API key for the model's provider. Pass it as a secret:
 ```bash
 valkyrie run start --benchmark swebench --agent mini_swe_agent \
   --model anthropic/claude-sonnet-4-6 -s ANTHROPIC_API_KEY <secret-ref> \
-  -k config=benchmarks/swebench.yaml --concurrency 10 --slice :10
+  -k config benchmarks/swebench.yaml --concurrency 10 --slice :10
 ```
 
 `--model` is a [litellm](https://docs.litellm.ai/docs/providers) model name and must include the
 provider, for example `anthropic/claude-sonnet-4-6` or `openai/gpt-5.4`. Use the secret that provider
 expects (`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...).
 
-| Kwarg (`-k name=value`) | Default | Meaning |
+| Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
 | `config` | `mini.yaml` | mini-swe-agent config. Use `benchmarks/swebench.yaml` for SWE-bench. |
 | `cost_limit` | empty | USD cap. Empty keeps upstream's default, `0` disables the cap. |
@@ -56,7 +56,7 @@ other ending (a bad API key, an unpriced model, a crash) exits 1 with a one-line
   `benchmarks/swebench.yaml` sets for Docker runs does not apply.
 - That environment runs each command with `/bin/sh`, not bash.
 - If a model is unknown to litellm, upstream stops with a cost-tracking error. Set
-  `-k cost_tracking=ignore_errors` for such models (and `cost_limit` then cannot stop the run).
+  `-k cost_tracking ignore_errors` for such models (and `cost_limit` then cannot stop the run).
 - API keys passed with `-s` are environment variables inside the sandbox, so the agent's own commands
   can read them.
 - The agent's Python runs with `-E`, so the task's `PYTHONPATH`, `PYTHONHOME` and other `PYTHON*`

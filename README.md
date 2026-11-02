@@ -73,7 +73,7 @@ model's provider expects (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...). The key i
 environment variable in the sandbox, so the agent's own commands can read it.
 
 Some agents need more than this. `mini_swe_agent` wants
-`-k config=benchmarks/swebench.yaml` on SWE-bench, and `terminus2` was built for
+`-k config benchmarks/swebench.yaml` on SWE-bench, and `terminus2` was built for
 Terminal-Bench (`--benchmark terminal-bench --dataset terminal-bench-2.1`). Check the
 agent specific documentation to know what other options are available.
 

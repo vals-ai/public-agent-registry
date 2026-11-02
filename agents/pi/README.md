@@ -31,14 +31,14 @@ The agent needs an API key for the model's provider. Pass it as a secret:
 ```bash
 valkyrie run start --benchmark swebench --agent pi \
   --model anthropic/claude-sonnet-4-6 -s ANTHROPIC_API_KEY <secret-ref> \
-  -k thinking=high --concurrency 10 --slice :10
+  -k thinking high --concurrency 10 --slice :10
 ```
 
 `--model` is pi's `provider/id` form, for example `anthropic/claude-sonnet-4-6` or `openai/gpt-5`, and
 `pi --list-models` lists them. Use the secret that provider expects (`OPENAI_API_KEY`,
 `GEMINI_API_KEY`, ...).
 
-| Kwarg (`-k name=value`) | Default | Meaning |
+| Kwarg (`-k name value`) | Default | Meaning |
 | --- | --- | --- |
 | `thinking` | empty | pi's thinking level (`--thinking`): `off`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. Empty keeps pi's default, `medium`. pi clamps the level to what the model supports, and ignores a value that is not one of these with a warning. |
 
