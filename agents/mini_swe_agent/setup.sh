@@ -23,7 +23,8 @@ rm "$uv_installer"
 uv="$uv_dir/uv"
 
 # The interpreter lives next to the venv, not under $HOME, so the agent runs under any user.
-UV_PYTHON_INSTALL_DIR="$python_dir" "$uv" venv --python 3.12 "$venv"
+# --clear rebuilds a venv left by an earlier attempt, so Valkyrie can retry a failed install here.
+UV_PYTHON_INSTALL_DIR="$python_dir" "$uv" venv --clear --python 3.12 "$venv"
 # The litellm extra "mcp" is requested because litellm 1.106 imports mcp for any request that carries
 # tools (mini-swe-agent's always do) but only lists it as an optional extra, so a plain install
 # fails with ModuleNotFoundError on the first model call.
