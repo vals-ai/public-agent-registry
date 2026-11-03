@@ -20,8 +20,7 @@ UV_UNMANAGED_INSTALL="$uv_dir" sh "$uv_installer"
 uv="$uv_dir/uv"
 
 UV_PYTHON_INSTALL_DIR="$python_dir" "$uv" venv --clear --python 3.12 "$venv"
-"$uv" pip install --python "$venv/bin/python" --exclude-newer "7 days" "$here/mini-swe-agent" "litellm[mcp]"
-"$uv" pip install --python "$venv/bin/python" "certifi>=2026.10.19"
+"$uv" pip install --python "$venv/bin/python" --exclude-newer "7 days" --exclude-newer-package certifi=false "certifi>=2026.10.19" "$here/mini-swe-agent" "litellm[mcp]!=1.107.0,!=1.82.7,!=1.82.8"
 
 mkdir -p /logs /usr/local/bin
 printf '#!/bin/bash\nexec %q -E %q "$@" < /dev/null\n' "$venv/bin/python" "$here/run.py" > /usr/local/bin/mini-swe-agent-run
