@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "model-library>=0.1.23",
+  "model-library>=0.1.41",
 ]
 
 [tool.uv]
