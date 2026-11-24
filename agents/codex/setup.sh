@@ -51,6 +51,6 @@ curl -LsSf https://astral.sh/uv/0.13.5/install.sh -o "$uv_installer"
 printf '%s  %s\n' '1c6e7f025499664633ac2dce43a210800510e9ef0625c52e034a8afdf8bf177a' "$uv_installer" | sha256sum -c -
 UV_UNMANAGED_INSTALL="$HOME/.local/bin" sh "$uv_installer"
 export PATH="$HOME/.local/bin:$PATH"
-cd /bundle/codex-v1.0.0 && "$HOME/.local/bin/uv" sync --locked
+cd /bundle/codex && "$HOME/.local/bin/uv" sync --locked
 
 mkdir -p /logs

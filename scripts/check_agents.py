@@ -18,6 +18,7 @@ HEX40 = re.compile(r"[0-9a-f]{40}")
 TAG_FORBIDDEN = re.compile(r"[\s*?\[\]\\]")
 CHECKSUM_LINE = re.compile(r"([0-9a-f]{64})  (\S+)")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+VERSION = re.compile(r"\d+(\.\d+)*(\.post\d+)?")
 FORBIDDEN_CONTRACT_FIELDS = ("secrets", "ingest_lambda")
 GIT_TIMEOUT = 60
 
@@ -73,12 +74,19 @@ def load_upstream(agent_dir: Path) -> tuple[dict | None, list[str]]:
         return None, [f"{name}: upstream.json must be a JSON object"]
 
     prefix = f"{name}: upstream.json"
+    version = upstream.get("version")
+    if not (isinstance(version, str) and VERSION.fullmatch(version)):
+        return None, [f"{prefix} 'version' must be a release version such as '1.2.3' or '1.2.3.post1'"]
+    if upstream.keys() == {"version"}:
+        return upstream, []
     problems = []
     if not _is_repo(upstream.get("repo")):
         problems.append(f"{prefix} 'repo' must be 'owner/name'")
     tag = upstream.get("tag")
     if not (_is_str(tag) and not TAG_FORBIDDEN.search(tag)):
         problems.append(f"{prefix} 'tag' must be a non-empty string without spaces or wildcards")
+    elif version.partition(".post")[0] != tag.removeprefix("v"):
+        problems.append(f"{prefix} 'version' {version} does not match tag {tag}")
     commit = upstream.get("commit")
     if not (isinstance(commit, str) and HEX40.fullmatch(commit)):
         problems.append(f"{prefix} 'commit' must be a 40-character lowercase hex SHA")
@@ -157,6 +165,15 @@ def _git(*args: str, cwd: Path, allow_exit_1: bool = False) -> str | None:
     if result.returncode != 0:
         raise RuntimeError(" ".join(result.stderr.split()) or f"git {args[0]} exited {result.returncode}")
     return result.stdout
+
+
+def check_release(agent_dir: Path, version: str) -> list[str]:
+    tag = f"{agent_dir.name}/v{version}"
+    if _git("rev-parse", "--quiet", "--verify", f"refs/tags/{tag}", cwd=ROOT, allow_exit_1=True) is None:
+        return []
+    if _git("diff", "--quiet", tag, "HEAD", "--", str(agent_dir.relative_to(ROOT)), cwd=ROOT, allow_exit_1=True) is None:
+        return [f"{agent_dir.name}: changed since release {tag}, so bump 'version' in upstream.json"]
+    return []
 
 
 def read_gitlinks(root: Path) -> dict[str, str | None]:
@@ -247,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
     upstreams = {agent_dir: load_upstream(agent_dir) for agent_dir in agent_dirs}
     tags: dict[Path, tuple[str | None, list[str]]] = {}
     if not args.offline:
-        valid = {agent_dir: upstream for agent_dir, (upstream, _) in upstreams.items() if upstream is not None}
+        valid = {agent_dir: upstream for agent_dir, (upstream, _) in upstreams.items() if upstream and "tag" in upstream}
         with ThreadPoolExecutor() as pool:
             tags = dict(zip(valid, pool.map(resolve_tag, [agent_dir.name for agent_dir in valid], valid.values())))
 
@@ -259,6 +276,9 @@ def main(argv: list[str] | None = None) -> int:
         problems += check_contract(agent_dir) + upstream_problems
         if upstream is None:
             broken_agents.add(f"agents/{name}")
+            continue
+        problems += check_release(agent_dir, upstream["version"])
+        if "submodule" not in upstream:
             continue
         path = f"agents/{name}/{PurePosixPath(upstream['submodule']).as_posix()}"
         agent_submodules.add(path)

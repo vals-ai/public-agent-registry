@@ -2,7 +2,7 @@
     "metadata": {
         "task_id": "astropy__astropy-12907",
         "model": "anthropic/claude-sonnet-4-20250514",
-        "agent": "claude_code-v1.0.0",
+        "agent": "claude_code",
         "cli_version": "2.1.162 (Claude Code)",
         "timestamp": "20260604215021",
         "output_path": "/logs",

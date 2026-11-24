@@ -17,25 +17,25 @@ We assume if you are here that you have [valkyrie](https://github.com/vals-ai/Va
 Install the agent from github using valkyrie for future use.
 
 ```bash
-valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/jf/agent-checkpoint/examples/claude_code-v1.0.0
+valkyrie agent install claude_code
 ```
 
 Download the agent, visit the [documentation](https://github.com/vals-ai/Valkyrie/blob/dev/docs/CONTRACTS.md) on **contract.yaml** if you would like to make any modifications.
 
 ```bash
-valkyrie agent download claude_code-v1.0.0
+valkyrie agent download claude_code
 ```
 
 Upload the agent after changes are made.
 
 ```bash
-valkyrie agent push claude_code-v1.0.0
+valkyrie agent push claude_code
 ```
 
 Run a benchmark using Claude Code as the agent. Specify `--model <MODEL>` to change the underlying model that powers Claude Code. Append to the contract or change it to allow any Claude Code compatible model when running Claude Code.
 
 ```bash
-valkyrie run start --benchmark swebench --agent claude_code-v1.0.0 -s ANTHROPIC_API_KEY <CLOUD_KEYNAME> --concurrency 10 --slice :10
+valkyrie run start --benchmark swebench --agent claude_code -s ANTHROPIC_API_KEY <CLOUD_KEYNAME> --concurrency 10 --slice :10
 ```
 
 ## Output Files

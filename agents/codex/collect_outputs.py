@@ -188,7 +188,7 @@ def write_summary(
         "metadata": {
             "task_id": task_id,
             "model": model,
-            "agent": "codex-v1.0.0",
+            "agent": "codex",
             "cli_version": get_cli_version(),
             "timestamp": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
             "output_path": str(OUTPUT_ROOT),

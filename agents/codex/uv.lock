@@ -390,7 +390,7 @@ wheels = [
 ]
 
 [[package]]
-name = "codex-v1-0-0"
+name = "codex"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

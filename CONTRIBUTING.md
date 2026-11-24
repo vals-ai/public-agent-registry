@@ -20,13 +20,13 @@ agents/<agent-name>/
   setup.sh          # install script used by contract.yaml
   <wrapper>         # run.sh, run.py, ...: adapts the task to the agent and collects its output
   README.md         # usage notes, required secrets, supported models, output files
-  upstream.json     # repo, tag and commit of the pinned upstream release
+  upstream.json     # registry version, plus repo, tag and commit of the pinned upstream release
   checksums.txt     # only if setup.sh downloads release assets: their sha256
   <submodule>/      # the upstream repository, pinned to the release tag
 ```
 
 The folder name is the contract's `name`. It does not carry a version, because the
-version is the pin in `upstream.json`: use `mini_swe_agent`, not `mini_swe_agent-v1.0.0`.
+version is `version` in `upstream.json`: use `mini_swe_agent`, not `mini_swe_agent-v1.0.0`.
 Valkyrie keys an agent by its name, and installing under an existing name replaces that
 agent, so a name never changes when the pin does.
 
@@ -64,13 +64,17 @@ be read inside the sandbox.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
+| `version` | yes | The registry release, `1.2.3` or `1.2.3.post1`. With a submodule it is `tag` without the `v`, plus `.postN` for a wrapper-only change. |
 | `repo` | yes | The upstream GitHub repository, `owner/name`. |
 | `tag` | yes | The pinned release tag, a plain version such as `v1.2.3`. |
 | `commit` | yes | The 40-character commit the tag points at. It must equal the submodule's pinned commit. |
 | `submodule` | yes | Path of the submodule inside the agent folder, relative. |
 | `assets` | no | Release asset file names that `setup.sh` downloads. Each needs a `<sha256>  <file name>` line in `checksums.txt`, exactly as `sha256sum` prints it (lowercase hex, two spaces, a bare file name): copy it from the release's `SHA256SUMS` (or `sha256sum.txt`) when it has one, otherwise download the asset and run `sha256sum`. Other lines, such as a static `jq`, stay as they are. |
 
-`scripts/check_agents.py` fails if `upstream.json` is malformed, if its commit differs
+An agent that installs its tool with the vendor's own installer, like `claude_code` and
+`codex`, has no submodule, and its `upstream.json` holds only `version`.
+
+`scripts/check_agents.py` fails if `upstream.json` is malformed, if `version` does not match `tag`, if its commit differs
 from the submodule's, if the tag does not resolve to that commit upstream, if the
 submodule URL is not `https://github.com/<repo>`, if an asset has no checksum line, or if
 a line in `checksums.txt` is not in that format.
@@ -199,7 +203,15 @@ uv sync
 uv run python scripts/check_agents.py            # --offline skips the upstream tag lookup
 ```
 
-`check-agents.yml` runs this on every pull request.
+`check-agents.yml` runs this on every pull request. It also fails when an agent folder
+changed since its release tag but `version` did not.
+
+## Releases
+
+- A release is a git tag `<agent-name>/v<version>`. Valkyrie resolves `valkyrie agent install <agent-name>@<version>` from these tags.
+- After a merge to `main`, `check-agents.yml` tags every `version` that has no tag yet.
+- Any change to an agent folder needs a new `version`. A wrapper-only fix keeps the upstream tag and adds `.post1`, `.post2`, and so on.
+- Release tags are never moved or deleted. A ruleset on `*/v*` tags enforces this.
 
 ## Updating an Agent
 
@@ -212,7 +224,7 @@ git -C agents/<agent-name>/<submodule> checkout --detach <tag>
 git -C agents/<agent-name>/<submodule> rev-parse HEAD     # the new commit
 ```
 
-Update `tag` and `commit` in `upstream.json`, refresh the asset lines in `checksums.txt` if
+Update `version`, `tag` and `commit` in `upstream.json`, refresh the asset lines in `checksums.txt` if
 the agent has `assets`, then `git add agents/<agent-name>`, run `scripts/check_agents.py`,
 and commit. Open the bump as a pull request with the update-agent template and run the smoke
 test below before merging. A bump changes the pin only: the contract's `name` stays the same.

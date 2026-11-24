@@ -1,4 +1,4 @@
-name: claude_code-v1.0.0
+name: claude_code
 
 install_cmd: "bash setup.sh"
 
@@ -12,5 +12,5 @@ defaults:
 
 run_cmd: >-
   bash -lc 'set -o pipefail && mkdir -p /logs &&
-  AGENT_OUTPUT_ROOT=/logs python3 /bundle/claude_code-v1.0.0/collect_outputs.py
+  AGENT_OUTPUT_ROOT=/logs python3 /bundle/claude_code/collect_outputs.py
   {problem_statement_path} --task-id {task_id} --model {model}'

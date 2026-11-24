@@ -12,20 +12,21 @@ upstream code is a git submodule inside it, pinned to a release tag.
 
 | Agent | Upstream | Description |
 | --- | --- | --- |
+| [`claude_code`](agents/claude_code/README.md) | [anthropics/claude-code](https://github.com/anthropics/claude-code) | Claude Code in headless mode, installed with its official installer. |
+| [`codex`](agents/codex/README.md) | [openai/codex](https://github.com/openai/codex) | The Codex CLI in exec mode, installed from npm. |
 | [`mini_swe_agent`](agents/mini_swe_agent/README.md) | [SWE-agent/mini-swe-agent](https://github.com/SWE-agent/mini-swe-agent) | The minimal AI software engineering agent from the SWE-agent team. |
 | [`opencode`](agents/opencode/README.md) | [anomalyco/opencode](https://github.com/anomalyco/opencode) | The open source AI coding agent, installed from its release binary. Follows the 1.x line. |
 | [`pi`](agents/pi/README.md) | [earendil-works/pi](https://github.com/earendil-works/pi) | A minimal, extensible agent harness, run in print mode from its release binary. |
 | [`terminus2`](agents/terminus2/README.md) | [harbor-framework/harbor](https://github.com/harbor-framework/harbor) | Terminus 2, the terminal agent built into Harbor, which works through a tmux session. Built for Terminal-Bench. |
 
-Each agent is pinned to an upstream release tag. The `tag` and `commit` are in the agent's
-`agents/<agent-name>/upstream.json`.
+Each agent's `agents/<agent-name>/upstream.json` holds its registry `version` and, for agents
+with a submodule, the upstream `repo`, `tag` and `commit`.
 Each agent's README lists its secrets, model names, kwargs and output files.
 
 ## Repository Layout
 
 - `agents/`: the agents above. Each is a folder holding its Valkyrie contract and
   wrapper scripts, with the upstream repository as a submodule inside it.
-- `examples/`: example contracts and reference implementations only.
 - `scripts/`: `check_agents.py` verifies every agent folder.
 - `CONTRIBUTING.md`: contribution workflow and review expectations.
 
@@ -37,7 +38,7 @@ agents/<agent-name>/
   setup.sh          # install script used by contract.yaml
   <wrapper>         # run.sh, run.py, ...: adapts the task to the agent and collects its output
   README.md         # usage notes, required secrets, supported models, output files
-  upstream.json     # repo, tag and commit of the pinned upstream release
+  upstream.json     # registry version, plus repo, tag and commit of the pinned upstream release
   checksums.txt     # only for agents that download release assets: their sha256
   <submodule>/      # the upstream repository, a shallow HTTPS submodule at the pinned tag
 ```
@@ -48,11 +49,17 @@ for the fields `contract.yaml` supports. Every pull request is checked against
 
 ## Using an Agent
 
-Install an agent by pointing Valkyrie at the agent directory:
+Install an agent by name. Valkyrie picks its highest release, or the one after `@`:
 
 ```bash
-valkyrie agent install https://github.com/vals-ai/public-agent-registry/tree/main/agents/<agent-name>
+valkyrie agent install <agent-name>
+valkyrie agent install <agent-name>@<version>
 ```
+
+Each release is a git tag `<agent-name>/v<version>`, made when `version` in `upstream.json`
+changes on `main`. Release tags never move, and Valkyrie installs the commit the tag points at.
+A full URL such as `https://github.com/vals-ai/public-agent-registry/tree/main/agents/<agent-name>`
+also works.
 
 Run a small slice with a benchmark to test. The agent reads its model provider's
 API key from an environment variable, which you pass with
@@ -79,16 +86,6 @@ Every run writes a `summary.json` into the agent's output folder, next to its
 trajectory. It holds the agent name, the outcome, the stop reason, the agent's exit
 code, and `upstream`: the contents of the agent's `upstream.json`, so it names the
 upstream repo, tag and commit that ran, whatever name the agent was installed under.
-
-## Reference Agents
-
-See `examples/` for working contracts:
-
-- [codex-v1.0.0](examples/codex-v1.0.0/README.md)
-- [claude_code-v1.0.0](examples/claude_code-v1.0.0/README.md)
-
-These examples show common setup patterns, output collection, and README
-structure.
 
 ## Contributing
 

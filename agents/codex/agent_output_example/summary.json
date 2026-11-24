@@ -2,7 +2,7 @@
     "metadata": {
         "task_id": "astropy__astropy-13236",
         "model": "gpt-5.3-codex",
-        "agent": "codex-v1.0.0",
+        "agent": "codex",
         "cli_version": "codex-cli 0.137.0",
         "timestamp": "20260604214512",
         "output_path": "/logs",
