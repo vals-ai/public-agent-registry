@@ -16,3 +16,9 @@ curl -fsSL https://claude.ai/install.sh | bash
 mkdir -p /logs
 
 ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude
+
+cat <<EOF >/usr/local/bin/claude_code-run
+#!/bin/sh
+exec python3 "$PWD/collect_outputs.py" "\$@"
+EOF
+chmod +x /usr/local/bin/claude_code-run

@@ -52,8 +52,9 @@ jobs:
 
       - name: Tag new agent versions
         run: |
-          for file in agents/*/upstream.json; do
-            tag="$(basename "$(dirname "$file")")/v$(jq -r .version "$file")"
+          for contract in agents/*/contract.yaml; do
+            agent="$(dirname "$contract")"
+            tag="$(basename "$agent")/v$(jq -r .version "$agent/upstream.json")"
             if ! git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
               git tag "$tag"
               git push origin "refs/tags/$tag"
