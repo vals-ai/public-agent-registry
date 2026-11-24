@@ -171,7 +171,8 @@ def check_release(agent_dir: Path, version: str) -> list[str]:
     tag = f"{agent_dir.name}/v{version}"
     if _git("rev-parse", "--quiet", "--verify", f"refs/tags/{tag}", cwd=ROOT, allow_exit_1=True) is None:
         return []
-    if _git("diff", "--quiet", tag, "HEAD", "--", str(agent_dir.relative_to(ROOT)), cwd=ROOT, allow_exit_1=True) is None:
+    folder = str(agent_dir.relative_to(ROOT))
+    if _git("diff", "--quiet", "--ignore-submodules=dirty", tag, "--", folder, cwd=ROOT, allow_exit_1=True) is None:
         return [f"{agent_dir.name}: changed since release {tag}, so bump 'version' in upstream.json"]
     return []
 
